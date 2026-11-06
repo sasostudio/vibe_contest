@@ -73,7 +73,7 @@ async function callGroq(prompt, messages) {
     'https://api.groq.com/openai/v1/chat/completions',
     { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     {
-      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
       max_tokens: prompt.maxTokens ?? MAX_OUTPUT_TOKENS,
       messages: [
         { role: 'system', content: system },
