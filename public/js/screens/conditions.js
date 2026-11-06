@@ -6,7 +6,7 @@ import { DEFAULT_CONDITIONS, GENERAL_AREAS, parseAiJson, sanitizeConditions } fr
 import { generatePlans } from '../../lib/planner.js';
 import { DAY_NAMES, WEEKDAYS } from '../../lib/timetable.js';
 import { askAi } from '../api.js';
-import { closeDialog, esc, pathLine, showBusy, win } from '../ui.js';
+import { closeDialog, esc, pathLine, showAlert, showBusy, win } from '../ui.js';
 import { save, state } from '../state.js';
 import { coursesByKeys, excludedGeneralCodes } from './courses.js';
 
@@ -16,7 +16,6 @@ const LIFE_PREFERENCES = ['점심시간 확보', '우주 공강 피하기', '연
 const LIFE_LABELS = { '점심시간 확보': '점심시간 꼭', '우주 공강 피하기': '우주 공강 싫음', '연강 피하기': '연강 싫음', '건물 이동 줄이기': '건물 이동 적게' };
 const TIME_TOGGLES = [['avoidMorning', '오전 수업 피하기 (12시 전)'], ['noFirst', '1교시 빼기 (10시 전)'], ['noNight', '야간 빼기 (18시 이후)']];
 const MAX_TEXT = 400;
-const COMPOSE_DELAY_MS = 400;
 
 const splitWords = (text) => text.split(',').map((w) => w.trim()).filter(Boolean);
 const areaLabel = (area) => area.replace('(핵심)', '');
@@ -204,11 +203,16 @@ export function showConditions(view) {
     state.conditionText = view.querySelector('#wish').value.trim();
     state.conditions = readForm(view);
     showBusy('수강 가능한 조합을 심사하고 있습니다.');
-    // 대기 창이 먼저 그려지도록 계산을 한 박자 늦춘다
-    setTimeout(() => {
-      runPlanner();
-      closeDialog();
-      location.hash = '#/plans';
-    }, COMPOSE_DELAY_MS);
+    // 가짜 지연 없이, 대기 창이 한 번 그려진 다음 프레임에 계산한다. 실패해도 창은 닫힌다.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      try {
+        runPlanner();
+        closeDialog();
+        location.hash = '#/plans';
+      } catch {
+        closeDialog();
+        showAlert('편성 실패', ['시간표를 계산하지 못했습니다. 과목이나 조건을 바꿔 다시 시도하십시오.']);
+      }
+    }));
   });
 }

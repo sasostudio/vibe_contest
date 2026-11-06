@@ -15,7 +15,7 @@ export function showProfile(view) {
     ? '<div class="box-note" id="compat-note"><b>궁합을 보려면 내 대표 시간표가 필요합니다.</b> 시간표를 짜서 등록하면 바로 친구와의 궁합 결과로 돌아갑니다.</div>'
     : '';
   view.innerHTML = `${pathLine('시간표 편성 신청', '학적 입력')}${compatNote}
-    ${win('학적 입력', `
+    ${win('시간표 리그 시즌 오픈!', `
       <form id="profile-form">
         <table class="form"><tbody>
           <tr><th scope="row"><label for="dept">소속 학과</label></th><td>
@@ -29,8 +29,8 @@ export function showProfile(view) {
           </td></tr>
           <tr><th scope="row"><label for="cap">학점 상한</label></th><td><select id="cap">${options(CREDIT_CAPS, p.creditCap, '학점')}</select></td></tr>
         </tbody></table>
-        <div class="row row-end" style="margin-top:9px"><button class="btn btn-go" type="submit">다음: 과목 확인</button></div>
-      </form>`)}`;
+        <div class="form-actions"><button class="btn btn-go btn-big" type="submit">다음: 과목 확인</button></div>
+      </form>`, 'hero')}`;
 
   view.querySelector('#profile-form').addEventListener('submit', (event) => {
     event.preventDefault();

@@ -16,7 +16,7 @@ export const sampleBanner = (league) =>
 function deptRows(departments, myDept) {
   return departments.slice(0, HOME_DEPTS).map((d) => `
     <tr class="${d.rank ? '' : 'pending'} ${d.dept === myDept ? 'mine' : ''}">
-      <td class="mid">${d.rank ?? '집계 중'}</td>
+      <td class="mid">${d.rank ? `<span class="medal${d.rank <= 3 ? ` m${d.rank}` : ''}">${d.rank}</span>` : '집계 중'}</td>
       <td>${esc(d.dept)}</td>
       <td class="num">${d.rank ? d.average.toFixed(1) : '-'}</td>
       <td class="num">${d.count}명</td>
@@ -26,7 +26,7 @@ function deptRows(departments, myDept) {
 function peopleRows(people) {
   return people.slice(0, HOME_PEOPLE).map((p, i) => `
     <tr>
-      <td class="mid">${i + 1}</td>
+      <td class="mid"><span class="medal${i < 3 ? ` m${i + 1}` : ''}">${i + 1}</span></td>
       <td>${esc(p.nickname)}</td>
       <td>${esc(p.dept)}</td>
       <td class="num">${p.score}</td>

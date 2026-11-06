@@ -11,8 +11,15 @@ import { save, state } from '../state.js';
 export async function startCompat(shareToken) {
   if (!(await ensureLogin())) return;
   showBusy('두 시간표의 궁합을 계산하고 있습니다.');
-  const { ok, data } = await makeCompat(shareToken);
-  closeDialog();
+  let result;
+  try {
+    result = await makeCompat(shareToken);
+  } catch {
+    result = { ok: false, data: { error: '서버에 연결하지 못했습니다. 잠시 뒤 다시 시도하십시오.' } };
+  } finally {
+    closeDialog();
+  }
+  const { ok, data } = result;
   if (ok) {
     state.pendingCompat = null;
     save();

@@ -49,7 +49,7 @@ async function rateCandidates(plans) {
 function checksHtml(sat) {
   const source = { ai: 'AI 평가', 'ai-corrected': 'AI 평가, 코드 보정' }[sat.source] ?? '간이 계산';
   const rows = sat.checks.map((c) =>
-    `<li><b>${c.met ? '충족' : '미충족'}</b> ${esc(c.label)}${c.reason ? ` <span class="hint">${esc(c.reason)}</span>` : ''}</li>`).join('');
+    `<li><b${c.met ? '' : ' class="no"'}>${c.met ? '충족' : '미충족'}</b> ${esc(c.label)}${c.reason ? ` <span class="hint">${esc(c.reason)}</span>` : ''}</li>`).join('');
   return `<div class="plan-note"><p><b>예상 만족도 ${sat.score}%</b> <span class="tag">${source}</span></p><ul>${rows}</ul></div>`;
 }
 
@@ -143,8 +143,11 @@ export async function showPlans(view) {
   if (plans.some((p) => !p.sat)) {
     view.innerHTML = pathLine('시간표 편성 신청', '편성 결과');
     showBusy(`AI가 후보 ${plans.length}개의 예상 만족도를 평가하고 있습니다.`);
-    plans = await rateCandidates(plans);
-    closeDialog();
+    try {
+      plans = await rateCandidates(plans);
+    } finally {
+      closeDialog();
+    }
   }
   paint(view, plans);
 }

@@ -12,8 +12,10 @@ export async function showShared(view, token) {
   }
   view.innerHTML = `${pathLine('공유된 심사 결과')}
     ${win(`${data.nickname} 님의 시간표 심사 결과`, `
-      <p class="paper-title">칭호: ${esc(data.title)}</p>
-      <p class="paper-review">${esc(data.review)}</p>
+      <div class="verdict">
+        <p class="paper-title"><small>칭호</small>${esc(data.title)}</p>
+        <p class="paper-review">${esc(data.review)}</p>
+      </div>
       <table class="form"><tbody>
         <tr><th scope="row">소속</th><td>${esc(data.dept)}</td></tr>
         <tr><th scope="row">총점</th><td><b>${data.score}점 ${esc(data.grade)}</b></td></tr>

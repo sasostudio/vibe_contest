@@ -16,7 +16,7 @@ function tableHtml(league) {
   }
   const rows = league.departments.map((d) => `
     <tr class="${d.rank ? '' : 'pending'} ${d.dept === state.profile?.dept ? 'mine' : ''}">
-      <td class="mid">${d.rank ?? '집계 중'}</td>
+      <td class="mid">${d.rank ? `<span class="medal${d.rank <= 3 ? ` m${d.rank}` : ''}">${d.rank}</span>` : '집계 중'}</td>
       <td>${esc(d.dept)}</td>
       <td class="num">${d.rank ? d.average.toFixed(1) : '-'}</td>
       <td class="num">${d.count}명</td>

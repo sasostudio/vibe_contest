@@ -29,19 +29,23 @@ function changeLine(entry) {
 
 function meHtml({ entry, standing }) {
   const sections = entry.sectionIds.map((id) => sectionById.get(id)).filter(Boolean);
+  const stat = (cls, label, value, sub) => `<div class="stat ${cls}"><p>${label}</p><b>${value}</b><span>${sub}</span></div>`;
   return `${pathLine('내 현황')}
+    <div class="stats">
+      ${stat('main', '내 점수', `${entry.score}점 ${esc(entry.grade)}`, changeLine(entry))}
+      ${stat('', '학과 내 순위', `${standing.deptRank}위`, `/ ${standing.deptTotal}명`)}
+      ${stat('', '전체 순위', `${standing.overallRank}위`, `/ ${standing.overallTotal}명`)}
+      ${stat('', '학과 순위', standing.deptLeagueRank ? `${standing.deptLeagueRank}위` : '집계 중', `평균 ${standing.deptAverage.toFixed(1)}점`)}
+    </div>
     <div class="split">
       <div>
         ${win(`${entry.nickname} 님의 현황`, `<table class="form"><tbody>
           <tr><th scope="row">소속</th><td>${esc(entry.dept)} ${entry.year}학년</td></tr>
-          <tr><th scope="row">내 점수</th><td><b>${entry.score}점 ${esc(entry.grade)}</b> (${changeLine(entry)})</td></tr>
-          <tr><th scope="row">칭호</th><td>${esc(entry.title)}</td></tr>
-          <tr><th scope="row">학과 내 순위</th><td>${standing.deptRank}위 / ${standing.deptTotal}명</td></tr>
-          <tr><th scope="row">전체 순위</th><td>${standing.overallRank}위 / ${standing.overallTotal}명</td></tr>
-          <tr><th scope="row">학과 순위</th><td>${deptLine(standing)}, 평균 ${standing.deptAverage.toFixed(1)}점</td></tr>
+          <tr><th scope="row">칭호</th><td><b>${esc(entry.title)}</b></td></tr>
+          <tr><th scope="row">학과 순위</th><td>${deptLine(standing)}</td></tr>
           <tr><th scope="row">학과 기여도</th><td>학과 평균을 ${signed(standing.contribution)}점 움직임</td></tr>
         </tbody></table>
-        <div class="row"><a class="btn btn-go" href="#/conditions">다시 짜기</a><a class="btn" href="#/league">학과 대항전</a></div>`)}
+        <div class="row row-end"><a class="btn" href="#/league">학과 대항전</a><a class="btn btn-go" href="#/conditions">다시 짜기</a></div>`)}
         ${win('결과 공유', `<p>칭호 「${esc(entry.title)}」</p><p class="hint">${esc(entry.review)}</p>
           <div class="row"><button class="btn btn-go" data-share>결과 공유하기</button><button class="btn" data-renew>공유 링크 새로 발급</button></div>
           <p class="hint">새로 발급하면 이전에 보낸 링크는 더 열리지 않습니다. 공유 화면에는 닉네임, 학과, 칭호, 평론, 등급, 점수만 나옵니다.</p>`)}
