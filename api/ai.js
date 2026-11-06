@@ -6,7 +6,8 @@ const PROVIDER_TIMEOUT_MS = 20000;
 const MAX_OUTPUT_TOKENS = 2048;
 // 11-06 실측: 1~2초 응답 · 무료 일일 500회. 3.8 Flash는 일일 20회에 60초를 넘겨 제외
 const DEFAULT_GEMINI_MODELS = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite';
-const RATE_LIMIT_PER_MINUTE = 60; // 대회장 참가자가 같은 공인 IP를 쓸 수 있어 넉넉하게 둔다
+// 발표 때 청중 약 60명이 같은 와이파이(공인 IP 하나)로 1~2분 안에 몰린다(13:09 관리자). 실제 한도는 Gemini 쪽이다
+const RATE_LIMIT_PER_MINUTE = 300;
 
 const hits = new Map();
 

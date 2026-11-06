@@ -101,7 +101,7 @@ test('잘못된 메시지 거부', async () => {
 
 test('분당 한도 초과 시 429', async () => {
   globalThis.fetch = async () => reply(200, geminiOk);
-  for (let i = 0; i < 60; i++) await run();
+  for (let i = 0; i < 300; i++) await run();
   const { status, data } = await run();
   assert.equal(status, 429);
   assert.equal(data.fallback, true);
