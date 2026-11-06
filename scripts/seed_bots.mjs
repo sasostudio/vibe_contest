@@ -1,6 +1,6 @@
 // 시연용 가상 학생을 순위표에 채운다. 시간표는 실제 강의 자료로 편성하고 점수는 서버와 같은 함수로 매긴다.
 // 기록마다 sample: true가 붙어 화면에 「시연용 가상 데이터」 표시가 뜬다. 다시 실행하면 가상 기록만 바뀐다.
-// 실행: node --env-file=.env.local scripts/seed_bots.mjs [인원]   (시험 컬렉션은 LEAGUE_NAMESPACE=test_)
+// 실행: node --env-file=.env.local scripts/seed_bots.mjs   (시험 컬렉션은 LEAGUE_NAMESPACE=test_)
 import { DATA } from '../public/data/courses.js';
 import { DEFAULT_CONDITIONS } from '../public/lib/conditions.js';
 import { defaultSelection, generatePlans, recommendedCourses } from '../public/lib/planner.js';
@@ -9,8 +9,12 @@ import { fixedTitle } from '../lib/verdict.js';
 import { SAMPLE_PREFIX, getEntry, replaceSampleLines } from '../lib/store.js';
 import { buildLeague } from '../lib/league.js';
 
-const TARGET = Number(process.argv[2] ?? 120);
-const DEPT_COUNT = 16;
+// 청중이 등록하면 순위가 눈에 띄게 움직이도록 학과당 인원을 적게 둔다 (13:05 관리자 결정: 약 30명)
+// 정보기술대학 학과는 2명: 청중 1명만 등록해도 3명이 되어 바로 순위에 든다
+const IT_DEPTS = ['컴퓨터공학부', '정보통신공학과', '임베디드시스템공학과', '데이터과학과'];
+const IT_EACH = 2;
+const OTHER_DEPT_COUNT = 6;
+const OTHER_EACH = [4, 4, 4, 3, 3, 3];
 const WORDS = ['공강수집가', '8호관유령', '점심수호자', '금요일망명자', '1교시생존자', '도서관붙박이', '셔틀대기자', '학식탐험가',
   '과제노예', '중도출석왕', '팀플방랑자', '송도바람', '시험기간좀비', '야간전사', '복학생', '새내기'];
 
@@ -30,10 +34,10 @@ const majorRich = DATA.depts
   .filter((d) => d.count >= 4)
   .sort((a, b) => b.count - a.count)
   .map((d) => d.dept);
-const depts = [...new Set(['정보통신공학과', '컴퓨터공학부', ...majorRich])].slice(0, DEPT_COUNT);
+const others = majorRich.filter((d) => !IT_DEPTS.includes(d)).slice(0, OTHER_DEPT_COUNT);
+const quota = [...IT_DEPTS.map((d) => [d, IT_EACH]), ...others.map((d, i) => [d, OTHER_EACH[i]])];
 
-function makeBot() {
-  const dept = pick(depts);
+function makeBot(dept) {
   const year = 1 + Math.floor(random() * 4);
   const profile = { dept, year, creditCap: 19 };
   const conditions = {
@@ -52,11 +56,16 @@ function makeBot() {
 }
 
 const lines = {};
-for (let tries = 0; Object.keys(lines).length < TARGET && tries < TARGET * 6; tries++) {
-  const bot = makeBot();
-  if (!bot) continue;
-  const n = Object.keys(lines).length;
-  lines[`${SAMPLE_PREFIX}${String(n).padStart(3, '0')}`] = { n: `${pick(WORDS)}${10 + Math.floor(random() * 90)}`, ...bot };
+for (const [dept, count] of quota) {
+  let made = 0;
+  for (let tries = 0; made < count && tries < count * 20; tries++) {
+    const bot = makeBot(dept);
+    if (!bot) continue;
+    const n = Object.keys(lines).length;
+    lines[`${SAMPLE_PREFIX}${String(n).padStart(3, '0')}`] = { n: `${pick(WORDS)}${10 + Math.floor(random() * 90)}`, ...bot };
+    made += 1;
+  }
+  if (made < count) console.log(`${dept}: ${made}/${count}명만 생성`);
 }
 
 // 점수 공식이 바뀌었을 때 실제 등록자도 저장된 분반으로 같은 공식에 맞춰 다시 채점한다(칭호·평론은 유지)
@@ -76,4 +85,4 @@ async function rescore(uid, line) {
 const summary = await replaceSampleLines(lines, rescore);
 const league = buildLeague(summary);
 console.log(`가상 ${league.sampleCount}명 · 전체 ${league.total}명 · 순위 학과 ${league.departments.filter((d) => d.rank).length}개`);
-console.log(league.departments.slice(0, 6).map((d) => `${d.rank ?? '-'} ${d.dept} ${d.average} (${d.count}명)`).join('\n'));
+console.log(league.departments.map((d) => `${d.rank ?? '-'} ${d.dept} ${d.average} (${d.count}명)`).join('\n'));
