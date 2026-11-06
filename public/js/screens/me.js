@@ -65,10 +65,15 @@ export async function showMe(view) {
   try {
     const me = await fetchMe();
     if (!me?.entry) {
+      // 이 계정에는 등록이 없다. 이전 계정의 결과가 남아 다른 이름이 보이지 않게 비운다
+      state.result = null;
+      save();
       view.innerHTML = emptyHtml();
       return;
     }
     state.result = { entry: me.entry, standing: me.standing, fresh: false };
+    // 다른 기기에서 로그인했으면 이 브라우저에 학적 입력이 없다. 등록 정보로 채워 바로 다시 짤 수 있게 한다.
+    state.profile ??= { dept: me.entry.dept, year: me.entry.year, nickname: me.entry.nickname, creditCap: 19 };
     save();
     view.innerHTML = meHtml(me);
     view.querySelector('[data-share]').addEventListener('click', () => shareMyResult(me.entry));

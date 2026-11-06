@@ -55,17 +55,19 @@ function paintChrome(route) {
     if (link.dataset.route === active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  const { profile } = state;
-  const who = profile ? `${esc(profile.nickname)} 님` : '비로그인 열람';
+  // 표시 이름: 로그인한 계정의 등록 닉네임이 우선, 없으면 이 브라우저의 학적 입력값.
+  // 14:39 관리자 지적: 학적 입력값만 읽어서 다른 기기에서 로그인해도 이름이 안 바뀌었다.
+  const nickname = (currentSession() && state.result?.entry?.nickname) || state.profile?.nickname || '';
+  const who = nickname ? `${esc(nickname)} 님` : currentSession() ? '로그인됨' : '비로그인 열람';
   // 로그인 창은 등록·궁합 때만 뜨므로, 다른 기기에서 돌아온 사람을 위해 위쪽 막대에 로그인 버튼을 둔다
   const account = currentSession()
     ? ' <button class="btn top-btn" data-account="logout">로그아웃</button>'
     : ' <button class="btn top-btn btn-go" data-account="login">로그인</button>';
   document.getElementById('top-user').innerHTML = `<span class="top-who">${who}</span>${account}`;
-  document.getElementById('rail-avatar').textContent = profile?.nickname?.[0] ?? '나';
+  document.getElementById('rail-avatar').textContent = nickname[0] ?? '나';
   // 횃불이는 데이터와 버튼을 가리지 않는 왼쪽 메뉴 아래에만 둔다(휴대폰에서는 숨김)
   document.getElementById('greet').innerHTML = `<img src="img/mascot/run-1.png" alt="" width="44" height="63">
-    <p><b>어서 와요, ${profile ? esc(profile.nickname) : '주자'}님!</b><br>실명 말고 닉네임으로 등록해요</p>`;
+    <p><b>어서 와요, ${nickname ? esc(nickname) : '주자'}님!</b><br>실명 말고 닉네임으로 등록해요</p>`;
 }
 
 async function route() {
