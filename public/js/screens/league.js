@@ -2,12 +2,12 @@
 import { fetchLeague } from '../api.js';
 import { esc, pathLine, win } from '../ui.js';
 import { state } from '../state.js';
-import { sampleBanner, sampleTag } from './home.js';
+import { sampleBanner } from './home.js';
 
 const POLL_MS = 30000;
 
 function topList(dept) {
-  return dept.top.map((p) => `${esc(p.nickname)}${sampleTag(p)} ${p.score}점 ${esc(p.grade)}`).join(', ');
+  return dept.top.map((p) => `${esc(p.nickname)} ${p.score}점 ${esc(p.grade)}`).join(', ');
 }
 
 function tableHtml(league) {

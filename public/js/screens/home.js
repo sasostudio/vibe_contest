@@ -7,8 +7,6 @@ const POLL_MS = 30000;
 const HOME_DEPTS = 10;
 const HOME_PEOPLE = 10;
 
-export const sampleTag = (person) => (person.sample ? ' <span class="tag">가상</span>' : '');
-
 // 가상 순위가 하나라도 섞이면 순위표 위에 반드시 표시한다
 export const sampleBanner = (league) =>
   (league.sampleCount > 0
@@ -29,7 +27,7 @@ function peopleRows(people) {
   return people.slice(0, HOME_PEOPLE).map((p, i) => `
     <tr>
       <td class="mid">${i + 1}</td>
-      <td>${esc(p.nickname)}${sampleTag(p)}</td>
+      <td>${esc(p.nickname)}</td>
       <td>${esc(p.dept)}</td>
       <td class="num">${p.score}</td>
       <td class="mid">${esc(p.grade)}</td>
