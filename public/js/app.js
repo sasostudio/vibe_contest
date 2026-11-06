@@ -57,8 +57,11 @@ function paintChrome(route) {
   }
   const { profile } = state;
   const who = profile ? `${esc(profile.nickname)} 님` : '비로그인 열람';
-  const logout = currentSession() ? ' <button class="btn top-btn" data-account="logout">로그아웃</button>' : '';
-  document.getElementById('top-user').innerHTML = `<span class="top-who">${who}</span>${logout}`;
+  // 로그인 창은 등록·궁합 때만 뜨므로, 다른 기기에서 돌아온 사람을 위해 위쪽 막대에 로그인 버튼을 둔다
+  const account = currentSession()
+    ? ' <button class="btn top-btn" data-account="logout">로그아웃</button>'
+    : ' <button class="btn top-btn btn-go" data-account="login">로그인</button>';
+  document.getElementById('top-user').innerHTML = `<span class="top-who">${who}</span>${account}`;
   document.getElementById('rail-avatar').textContent = profile?.nickname?.[0] ?? '나';
   // 횃불이는 데이터와 버튼을 가리지 않는 왼쪽 메뉴 아래에만 둔다(휴대폰에서는 숨김)
   document.getElementById('greet').innerHTML = `<img src="img/mascot/run-1.png" alt="" width="44" height="63">

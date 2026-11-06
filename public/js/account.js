@@ -47,6 +47,13 @@ export function ensureLogin() {
   });
 }
 
+// 위쪽 막대의 로그인. 로그인하면 내 현황으로 간다(이미 내 현황이면 다시 그린다).
+async function loginAndShowMe() {
+  if (!(await ensureLogin())) return;
+  if (location.hash === '#/me') window.dispatchEvent(new HashChangeEvent('hashchange'));
+  else location.hash = '#/me';
+}
+
 export function askLogout() {
   const anonymous = currentSession()?.provider === 'anonymous';
   const lines = anonymous
@@ -100,6 +107,7 @@ export function accountHtml(hasEntry) {
 export function bindAccountButtons(root) {
   root.addEventListener('click', (event) => {
     const action = event.target.closest('[data-account]')?.dataset.account;
+    if (action === 'login') loginAndShowMe();
     if (action === 'logout') askLogout();
     if (action === 'reset') askReset();
     if (action === 'withdraw') askWithdraw();
