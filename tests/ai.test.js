@@ -100,3 +100,22 @@ test('분당 한도 초과 시 429', async () => {
   assert.equal(status, 429);
   assert.equal(data.fallback, true);
 });
+
+test('깨진 JSON 본문 거부', async () => {
+  const req = { method: 'POST', headers: {} };
+  Object.defineProperty(req, 'body', { get() { throw new SyntaxError('bad json'); } });
+  const out = {};
+  await handler(req, {
+    status(code) { out.status = code; return this; },
+    json(data) { out.data = data; return this; },
+  });
+  assert.equal(out.status, 400);
+});
+
+test('두 제공자 모두 출력 토큰 상한 전달', async () => {
+  const sent = [];
+  globalThis.fetch = async (url, init) => { sent.push(JSON.parse(init.body)); return reply(500); };
+  await run();
+  assert.equal(sent[0].generationConfig.maxOutputTokens, 2048);
+  assert.equal(sent[1].max_tokens, 2048);
+});

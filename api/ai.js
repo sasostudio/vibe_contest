@@ -3,6 +3,7 @@ import { PROMPTS } from '../prompts/index.js';
 const MAX_MESSAGES = 30;
 const MAX_TOTAL_CHARS = 8000;
 const PROVIDER_TIMEOUT_MS = 20000;
+const MAX_OUTPUT_TOKENS = 2048;
 const RATE_LIMIT_PER_MINUTE = 60; // 대회장 참가자가 같은 공인 IP를 쓸 수 있어 넉넉하게 둔다
 
 const hits = new Map();
@@ -54,7 +55,10 @@ async function callGemini({ system, json }, messages) {
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.text }],
       })),
-      ...(json ? { generationConfig: { responseMimeType: 'application/json' } } : {}),
+      generationConfig: {
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        ...(json ? { responseMimeType: 'application/json' } : {}),
+      },
     },
   );
   return (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
@@ -66,6 +70,7 @@ async function callGroq({ system, json }, messages) {
     { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     {
       model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      max_tokens: MAX_OUTPUT_TOKENS,
       messages: [
         { role: 'system', content: system },
         ...messages.map((m) => ({ role: m.role, content: m.text })),
@@ -90,13 +95,20 @@ export default async function handler(req, res) {
   const ip = String(req.headers['x-forwarded-for'] ?? 'local').split(',')[0].trim();
   if (isRateLimited(ip)) return res.status(429).json({ error: '요청이 너무 많음', fallback: true });
 
-  const problem = validate(req.body);
+  let body;
+  try {
+    body = req.body; // Vercel은 깨진 JSON이면 이 접근에서 예외를 던진다
+  } catch {
+    return res.status(400).json({ error: '잘못된 JSON' });
+  }
+
+  const problem = validate(body);
   if (problem) return res.status(400).json({ error: problem });
 
-  const prompt = PROMPTS[req.body.task];
+  const prompt = PROMPTS[body.task];
   for (const provider of activeProviders()) {
     try {
-      const text = await provider.call(prompt, req.body.messages);
+      const text = await provider.call(prompt, body.messages);
       if (text) return res.status(200).json({ text, provider: provider.name });
       console.error(`${provider.name}: 빈 응답`);
     } catch (err) {
