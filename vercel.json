@@ -1,5 +1,6 @@
 {
   "functions": {
-    "api/ai.js": { "maxDuration": 60 }
+    "api/ai.js": { "maxDuration": 60 },
+    "api/register.js": { "maxDuration": 60 }
   }
 }

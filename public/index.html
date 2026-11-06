@@ -3,36 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>준비 중</title>
-  <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f6f5f1; color: #222; }
-    main { padding: 16px; text-align: center; }
-    button { padding: 10px 16px; font-size: 16px; cursor: pointer; }
-    #result { min-height: 24px; }
-  </style>
+  <title>시간표 리그 통합행정시스템</title>
+  <meta name="description" content="말로 시간표를 짜고, 대표 시간표 점수로 학과끼리 겨루는 인천대 학과 대항전">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231f3a6e'/%3E%3Cpath d='M3 5h10M3 8h10M3 11h10M6 3v10M10 3v10' stroke='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@700;800&display=swap">
+  <link rel="stylesheet" href="css/portal.css">
 </head>
 <body>
-  <main>
-    <h1>준비 중</h1>
-    <button id="check">AI 연결 확인</button>
-    <p id="result"></p>
-  </main>
-  <script>
-    const result = document.getElementById('result');
-    document.getElementById('check').addEventListener('click', async () => {
-      result.textContent = '확인 중';
-      try {
-        const res = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task: 'ping', messages: [{ role: 'user', text: '연결 확인' }] }),
-        });
-        const data = await res.json();
-        result.textContent = res.ok ? `${data.provider}: ${data.text}` : data.error;
-      } catch {
-        result.textContent = '서버 연결 실패';
-      }
-    });
-  </script>
+  <header class="top">
+    <a class="top-name" href="#/">시간표 리그 통합행정시스템</a>
+    <span class="top-user" id="top-user"></span>
+  </header>
+  <nav class="menu" aria-label="주 메뉴">
+    <a href="#/">학과 대항전 현황</a>
+    <a href="#/profile">시간표 편성 신청</a>
+    <a href="#/me">내 현황</a>
+    <a href="#/league">학과별 순위표</a>
+  </nav>
+  <div class="notice" aria-hidden="true"><span>[공지] 2026학년도 2학기 시간표 심사 접수 중 · 1교시 신청자는 본인 의사임을 재확인하시기 바랍니다 · 공강은 학칙상 권리가 아니라 실력입니다</span></div>
+  <div class="layout">
+    <aside class="steps" aria-label="진행 단계">
+      <p class="steps-title">시간표 편성 절차</p>
+      <ol id="steps"></ol>
+    </aside>
+    <main id="view" tabindex="-1"></main>
+  </div>
+  <footer class="foot">
+    <p>본 시스템은 1024×768 해상도와 사용자의 인내심에 최적화되어 있습니다.</p>
+    <p>바이브코딩 대회 출품작이며 학교의 공식 시스템이 아닙니다. 강의 자료 기준일: 2026. 8. 4.</p>
+  </footer>
+  <div id="dialog"></div>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

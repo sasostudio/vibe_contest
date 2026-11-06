@@ -8,4 +8,12 @@
 | 서비스 내 AI | Gemini API | 앱 안의 AI 호출 (주력 후보) | https://ai.google.dev/gemini-api/docs |
 | 서비스 내 AI | Groq API | 앱 안의 AI 호출 (예비 후보) | https://console.groq.com/docs |
 
-외부 코드와 라이브러리: 현재 미사용.
+| 자체 교훈 | 옛 시간표편성기 (2026-08, 관리자 개인 도구) | 코드는 가져오지 않고 교훈 3개만 재사용: 요일 생략 시 직전 요일 상속, 식별 단위 = 과목번호+학과, 조합 실패 시 원인과 대안 제시 | 작업로그 2026-08 |
+| 자료 | 인천대 2026-2 종합강의시간표, 교양 최초 정원 공지 | 분반·시간·강의실·학점·정원 (교수 이름은 파싱 단계에서 제외) | 학교 공지 원본 xlsx |
+
+| 글꼴 | Black Han Sans, Nanum Gothic, Nanum Myeongjo (Google Fonts, SIL OFL) | 도장, 본문, 통지서 제목 | https://fonts.google.com |
+| 라이브러리 | Firebase JS SDK 12.6.0 (gstatic CDN) | 구글 로그인 팝업만 사용. 익명 로그인과 토큰 갱신은 REST 직접 호출 | https://firebase.google.com/docs/web/setup |
+| 서비스 | Firebase Authentication, Cloud Firestore REST API | 로그인, 대표 시간표 저장 | https://firebase.google.com/docs/firestore/use-rest-api |
+| 시험 도구 | playwright-core (로컬 기존 설치본) | 헤드리스 화면 시험과 스크린샷. 배포물에는 포함하지 않음 | https://playwright.dev |
+
+외부 코드 복사: 없음. 시간표 계산, 점수, 랭킹 코드는 이번 대회 중 새로 작성.

@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// 브라우저는 Firestore에 직접 닿지 않는다. 읽기와 쓰기 모두 서버 전용 계정만 허용한다.
+// 점수를 브라우저가 쓸 수 없어야 랭킹을 믿을 수 있고, 공개 정보는 /api/league가 골라서 내보낸다.
+// 이 uid는 비밀이 아니다. 비밀은 Vercel 환경 변수의 refresh token이다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == 'Pr9EAgb6PDho5fstlMto4DkqRjv1';
+    }
+  }
+}

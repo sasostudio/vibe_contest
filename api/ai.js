@@ -95,6 +95,20 @@ function activeProviders() {
   ].filter((p) => p.key);
 }
 
+// 폴백 순서대로 시도한다. 전부 실패하면 null이며 호출한 쪽이 고정 문구로 이어 간다.
+export async function askAi(task, messages) {
+  for (const provider of activeProviders()) {
+    try {
+      const text = await provider.call(PROMPTS[task], messages);
+      if (text) return { text, provider: provider.name };
+      console.error(`${provider.name}: 빈 응답`);
+    } catch (err) {
+      console.error(`${provider.name}: ${err.message}`);
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 허용' });
 
@@ -111,16 +125,8 @@ export default async function handler(req, res) {
   const problem = validate(body);
   if (problem) return res.status(400).json({ error: problem });
 
-  const prompt = PROMPTS[body.task];
-  for (const provider of activeProviders()) {
-    try {
-      const text = await provider.call(prompt, body.messages);
-      if (text) return res.status(200).json({ text, provider: provider.name });
-      console.error(`${provider.name}: 빈 응답`);
-    } catch (err) {
-      console.error(`${provider.name}: ${err.message}`);
-    }
-  }
+  const answer = await askAi(body.task, body.messages);
+  if (answer) return res.status(200).json(answer);
   // fallback: true를 받은 화면은 내장 콘텐츠로 시연을 이어간다
   return res.status(503).json({ error: 'AI 사용 불가', fallback: true });
 }

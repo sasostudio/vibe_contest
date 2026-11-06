@@ -1,3 +1,9 @@
+.vercel
+.claude/
 *.md
 tests/
 .env*
+firebase.json
+.firebaserc
+firestore.rules
+scripts/
