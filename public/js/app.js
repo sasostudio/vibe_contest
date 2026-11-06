@@ -12,6 +12,8 @@ import { showResult } from './screens/result.js';
 import { showMe } from './screens/me.js';
 import { showLeague } from './screens/league.js';
 import { showJoin } from './screens/join.js';
+import { showShared } from './screens/shared.js';
+import { showCompat } from './screens/compat.js';
 
 const ROUTES = {
   '': showHome,
@@ -23,6 +25,8 @@ const ROUTES = {
   me: showMe,
   league: showLeague,
   join: showJoin,
+  s: showShared, // #/s/공유값
+  c: showCompat, // #/c/궁합값
 };
 
 const STEPS = [
@@ -53,14 +57,14 @@ function paintChrome(route) {
 }
 
 async function route() {
-  const name = location.hash.replace(/^#\/?/, '');
+  const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
   const show = ROUTES[name] ?? showHome;
   if (cleanup) cleanup();
   cleanup = null;
   closeDialog();
   paintChrome(name);
   window.scrollTo(0, 0);
-  cleanup = (await show(view)) ?? null;
+  cleanup = (await show(view, arg)) ?? null;
   paintChrome(name);
 }
 

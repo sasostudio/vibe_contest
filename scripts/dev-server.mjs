@@ -27,12 +27,13 @@ function wrap(res) {
 }
 
 const server = createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, 'http://local');
+  const { pathname, searchParams } = new URL(req.url, 'http://local');
   if (pathname.startsWith('/api/')) {
     const file = join('api', `${pathname.slice(5)}.js`);
     if (!existsSync(file)) return wrap(res).status(404).json({ error: '없음' });
     const { default: handler } = await import(pathToFileURL(file).href);
     req.body = await readBody(req);
+    req.query = Object.fromEntries(searchParams); // Vercel과 같게
     return handler(req, wrap(res));
   }
   const file = join('public', normalize(pathname === '/' ? 'index.html' : pathname));

@@ -38,6 +38,24 @@ export async function fetchMe() {
   return res.json();
 }
 
+async function json(res) {
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+export const fetchShare = async (token) => json(await fetch(`/api/share?t=${encodeURIComponent(token)}`));
+export const issueShare = async (renew = false) => json(await fetch('/api/share', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+  body: JSON.stringify({ renew }),
+}));
+export const fetchCompat = async (token) => json(await fetch(`/api/compat?c=${encodeURIComponent(token)}`));
+export const makeCompat = async (shareToken) => json(await fetch('/api/compat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+  body: JSON.stringify({ t: shareToken }),
+}));
+
 export async function withdrawTimetable() {
   const res = await fetch('/api/withdraw', { method: 'POST', headers: await authHeaders() });
   if (!res.ok) throw new Error('등록 취소 실패');

@@ -83,6 +83,12 @@ tr.pending td { color: var(--mute); }
 .class.clash { border: 2px solid #d00; }
 .clash-note { color: #b00; font-weight: 700; }
 .chip { margin: 2px 4px 2px 0; font-weight: 400; }
+.type-card { margin: 6px 0; padding: 8px 10px; background: #f4f7fb; border: 1px solid var(--sky); }
+.type-img { display: block; max-width: 160px; margin-bottom: 6px; }
+.type-name { font: 800 20px var(--formal); }
+.type-line { margin-top: 2px; }
+.paper-type { margin-top: 12px; max-width: 26em; }
+.compat-score { margin: 6px 0; font: 800 34px var(--formal); }
 .top-btn { min-height: 22px; margin-left: 6px; padding: 1px 8px; font-size: 12px; }
 .join { text-align: center; }
 .join-qr { display: inline-block; padding: 16px; background: #fff; border: 1px solid var(--line); }

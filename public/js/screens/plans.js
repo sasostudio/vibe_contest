@@ -6,7 +6,7 @@ import { planSummary } from '../../lib/planner.js';
 import { bySatisfaction, planFacts, readAiSatisfaction, simpleSatisfaction } from '../../lib/satisfaction.js';
 import { eligibilityProblems, scoreTimetable } from '../../lib/score.js';
 import { askAi, registerTimetable } from '../api.js';
-import { currentSession, signInAnonymously, signInWithGoogle } from '../auth.js';
+import { ensureLogin } from '../account.js';
 import { closeDialog, esc, hourRange, openDialog, pathLine, showAlert, showBusy, timetableGrid, win } from '../ui.js';
 import { save, state } from '../state.js';
 import { runPlanner } from './conditions.js';
@@ -69,32 +69,8 @@ function planHtml(plan, index, range) {
   </section>`;
 }
 
-function askLogin() {
-  return new Promise((resolve) => {
-    const modal = openDialog('본인 확인', `
-      <p>대표 시간표는 계정마다 1개만 등록됩니다. 로그인 방법을 고르십시오.</p>
-      <div class="row"><button class="btn btn-go" data-how="google">구글 로그인</button><button class="btn" data-how="anonymous">익명으로 계속</button><button class="btn" data-how="cancel">취소</button></div>
-      <p class="hint" id="login-status">익명으로 등록하면 이 브라우저에서만 내 현황을 볼 수 있습니다.</p>`);
-    modal.addEventListener('click', async (event) => {
-      const how = event.target.dataset.how;
-      if (!how) return;
-      if (how === 'cancel') {
-        closeDialog();
-        resolve(false);
-        return;
-      }
-      try {
-        await (how === 'google' ? signInWithGoogle() : signInAnonymously());
-        resolve(true);
-      } catch {
-        modal.querySelector('#login-status').textContent = '로그인에 실패했습니다. 익명으로 계속을 눌러 진행하십시오.';
-      }
-    });
-  });
-}
-
 async function register(plan) {
-  if (!currentSession() && !(await askLogin())) return;
+  if (!(await ensureLogin())) return;
   showBusy('서버가 시간표를 심사하고 있습니다.');
   const { profile } = state;
   try {

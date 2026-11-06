@@ -1,4 +1,5 @@
 import { PROMPTS } from '../prompts/index.js';
+import { clientIp, createLimiter } from '../lib/ratelimit.js';
 
 const MAX_MESSAGES = 30;
 const MAX_TOTAL_CHARS = 12000; // 만족도 평가는 후보 12개의 사실을 한 번에 보낸다
@@ -9,17 +10,10 @@ const DEFAULT_GEMINI_MODELS = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite';
 // 발표 때 청중 약 60명이 같은 와이파이(공인 IP 하나)로 1~2분 안에 몰린다(13:09 관리자). 실제 한도는 Gemini 쪽이다
 const RATE_LIMIT_PER_MINUTE = 300;
 
-const hits = new Map();
-
-function isRateLimited(ip, now = Date.now()) {
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 60000);
-  recent.push(now);
-  hits.set(ip, recent);
-  return recent.length > RATE_LIMIT_PER_MINUTE;
-}
+const limiter = createLimiter(RATE_LIMIT_PER_MINUTE);
 
 export function resetRateLimit() {
-  hits.clear();
+  limiter.reset();
 }
 
 function validate(body) {
@@ -104,7 +98,7 @@ function activeProviders() {
 
 // 한도 초과(429)나 과부하(503)일 때 다시 줄을 설 수 있는 시간. 평소에는 기다리지 않는다.
 // 발표 때 청중 60명이 동시에 쓴다(13:21 관리자 결정: 넘칠 때만 대기). 칭호가 가장 오래 기다릴 가치가 있다.
-const WAIT_BUDGET_MS = { verdict: 30000, conditions: 15000, satisfaction: 8000 };
+const WAIT_BUDGET_MS = { verdict: 30000, compat: 20000, conditions: 15000, satisfaction: 8000 };
 const RETRY_GAP_MS = [800, 2000];
 const isBusy = (err) => err.status === 429 || err.status === 503 || err.name === 'TimeoutError';
 const pause = () => new Promise((r) => setTimeout(r, RETRY_GAP_MS[0] + Math.random() * (RETRY_GAP_MS[1] - RETRY_GAP_MS[0])));
@@ -136,8 +130,7 @@ export async function askAi(task, messages) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 허용' });
 
-  const ip = String(req.headers['x-forwarded-for'] ?? 'local').split(',')[0].trim();
-  if (isRateLimited(ip)) return res.status(429).json({ error: '요청이 너무 많음', fallback: true });
+  if (limiter.limited(clientIp(req))) return res.status(429).json({ error: '요청이 너무 많음', fallback: true });
 
   let body;
   try {

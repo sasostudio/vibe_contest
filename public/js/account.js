@@ -1,6 +1,6 @@
 // 계정 관리: 로그아웃, 작성 기록 초기화, 대표 등록 취소. 셋 다 확인 창을 거친다.
 import { withdrawTimetable } from './api.js';
-import { currentSession, signOut } from './auth.js';
+import { currentSession, signInAnonymously, signInWithGoogle, signOut } from './auth.js';
 import { closeDialog, esc, openDialog, showAlert, showBusy } from './ui.js';
 import { resetState, save, state } from './state.js';
 
@@ -19,6 +19,33 @@ const goHome = () => {
   if (location.hash === '#/' || location.hash === '') location.reload();
   else location.hash = '#/';
 };
+
+// 로그인이 필요할 때 부른다. 이미 로그인했으면 바로 true, 취소하면 false.
+export function ensureLogin() {
+  if (currentSession()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const modal = openDialog('본인 확인', `
+      <p>대표 시간표와 궁합 결과는 계정마다 따로 저장됩니다. 로그인 방법을 고르십시오.</p>
+      <div class="row"><button class="btn btn-go" data-how="google">구글 로그인</button><button class="btn" data-how="anonymous">익명으로 계속</button><button class="btn" data-how="cancel">취소</button></div>
+      <p class="hint" id="login-status">익명으로 계속하면 이 브라우저에서만 내 현황을 볼 수 있습니다.</p>`);
+    modal.addEventListener('click', async (event) => {
+      const how = event.target.dataset.how;
+      if (!how) return;
+      if (how === 'cancel') {
+        closeDialog();
+        resolve(false);
+        return;
+      }
+      try {
+        await (how === 'google' ? signInWithGoogle() : signInAnonymously());
+        closeDialog();
+        resolve(true);
+      } catch {
+        modal.querySelector('#login-status').textContent = '로그인에 실패했습니다. 익명으로 계속을 눌러 진행하십시오.';
+      }
+    });
+  });
+}
 
 export function askLogout() {
   const anonymous = currentSession()?.provider === 'anonymous';

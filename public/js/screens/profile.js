@@ -11,7 +11,10 @@ export function showProfile(view) {
   const options = (values, selected, unit) =>
     values.map((v) => `<option value="${v}"${v === selected ? ' selected' : ''}>${v}${unit}</option>`).join('');
 
-  view.innerHTML = `${pathLine('시간표 편성 신청', '학적 입력')}
+  const compatNote = state.pendingCompat
+    ? '<div class="box-note" id="compat-note"><b>궁합을 보려면 내 대표 시간표가 필요합니다.</b> 시간표를 짜서 등록하면 바로 친구와의 궁합 결과로 돌아갑니다.</div>'
+    : '';
+  view.innerHTML = `${pathLine('시간표 편성 신청', '학적 입력')}${compatNote}
     ${win('학적 입력', `
       <form id="profile-form">
         <table class="form"><tbody>

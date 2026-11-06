@@ -1,6 +1,13 @@
 // 10번 화면. 심사 결과 통지서와 도장. 이 화면의 값은 전부 서버 응답이다.
 import { esc, pathLine, scoreTable } from '../ui.js';
 import { save, state } from '../state.js';
+import { DATA } from '../../data/courses.js';
+import { typeCardHtml, typeOfEntry } from '../typecard.js';
+import { shareMyResult } from '../share.js';
+import { startCompat } from './compat.js';
+
+const sectionById = new Map(DATA.courses.map((c) => [c.id, c]));
+const COMPAT_RETURN_MS = 2800; // 도장이 찍힌 걸 본 뒤 궁합으로 돌아간다
 
 const STAMP_DELAY_MS = 1100;
 
@@ -52,6 +59,7 @@ export function showResult(view) {
   const satLine = satisfaction
     ? `<p class="hint">예상 만족도 ${satisfaction.score}% (${satisfaction.source === 'simple' ? '간이 계산' : 'AI 평가'}, 순위에는 반영하지 않음)</p>`
     : '';
+  const type = typeOfEntry(entry, (entry.sectionIds ?? []).map((id) => sectionById.get(id)).filter(Boolean));
   const date = new Date(entry.updatedAt);
   const dateText = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
 
@@ -68,18 +76,27 @@ export function showResult(view) {
       ${scoreTable(entry.items)}
       <p class="paper-title">칭호: ${esc(entry.title)}</p>
       <p class="paper-review">${esc(entry.review)}</p>
+      <div class="paper-type"><p class="hint">시간표 유형</p>${typeCardHtml(type)}</div>
       <p class="paper-date">${dateText}<br>시간표 심사위원회</p>
       <div class="stamp hidden">${stampSvg(entry.grade, entry.stamp)}</div>
     </article>
+    ${state.pendingCompat ? '<div class="box-note" style="max-width:700px;margin:0 auto 9px">등록이 끝났습니다. 곧 친구와의 궁합 결과로 이동합니다.</div>' : ''}
     <div class="row row-end" style="max-width:700px;margin:0 auto">
+      <button class="btn btn-go" id="share-result">공유하기</button>
       <a class="btn" href="#/conditions">다시 짜기</a>
       <a class="btn" href="#/league">학과 대항전</a>
       <a class="btn btn-go" href="#/me">내 현황 보기</a>
     </div>
     <p class="hint" style="max-width:700px;margin:9px auto 0">학과 내 ${standing.deptRank}위 / ${standing.deptTotal}명, 전체 ${standing.overallRank}위 / ${standing.overallTotal}명</p>`;
 
+  view.querySelector('#share-result').addEventListener('click', () => shareMyResult(entry, type.name));
   const stop = revealStamp(view, fresh);
   state.result.fresh = false;
   save();
-  return stop;
+  const pending = state.pendingCompat;
+  const back = pending ? setTimeout(() => startCompat(pending), COMPAT_RETURN_MS) : null;
+  return () => {
+    stop?.();
+    clearTimeout(back);
+  };
 }

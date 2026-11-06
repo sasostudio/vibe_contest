@@ -16,6 +16,7 @@ const initial = () => ({
   plans: null, // [{ ids: [분반 번호], sat: 예상 만족도 }]
   diagnosis: null,
   result: null, // 서버가 돌려준 { entry, standing }
+  pendingCompat: null, // 친구 링크에서 궁합을 누른 뒤 등록하러 간 경우 그 링크값. 등록이 끝나면 궁합으로 돌아온다
 });
 
 function load() {
