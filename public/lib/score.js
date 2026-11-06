@@ -13,6 +13,7 @@ const LUNCH_MIN = 50;
 const BACK_TO_BACK_GAP = 15;
 const LONG_RUN_MIN = 240;
 const LONG_GAP_MIN = 120; // 수업 사이 2시간 이상 비면 우주 공강
+export const MORNING_END = 12 * 60; // 관리자 정의: 오전 수업 = 12시 전 시작
 
 const MAJOR_TYPES = new Set(['전공기초', '전공핵심', '전공심화']);
 
@@ -67,6 +68,7 @@ function measure(sections) {
     movePairs: 0,
     longGaps: 0,
     maxGap: 0,
+    morningBlocks: 0, // 12시 전 시작 수업. 총점에는 쓰지 않고 「오전 수업 피하기」 판단에만 쓴다
   };
   const online = sections.filter((s) => s.slots.length === 0).reduce((sum, s) => sum + s.credits, 0);
   stats.effectiveCredits = stats.credits - online + Math.min(online, ONLINE_CREDIT_LIMIT);
@@ -75,6 +77,7 @@ function measure(sections) {
     if (hasLunch(blocks)) stats.lunchDays += 1;
     if (blocks[0].start < FIRST_PERIOD_END) stats.firstPeriodDays += 1;
     stats.nightBlocks += blocks.filter((b) => b.start >= NIGHT_START).length;
+    stats.morningBlocks += blocks.filter((b) => b.start < MORNING_END).length;
     for (const run of runsOf(blocks)) {
       if (run.length >= 3 || run.at(-1).end - run[0].start >= LONG_RUN_MIN) stats.longRuns += 1;
     }

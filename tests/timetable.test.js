@@ -213,3 +213,23 @@ test('만족도: 후보에 없는 과목을 근거로 쓰면 간이 계산으로
   const [sat] = readAiSatisfaction(parsed, [plan], DEFAULT_CONDITIONS, ['빅데이터개론']);
   assert.equal(sat.source, 'simple');
 });
+
+test('편성: 오전 수업 피하기는 오전 수업이 적은 안을 먼저 낸다', () => {
+  const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 24 };
+  const courses = recommendedCourses(DATA, profile).slice(0, 3);
+  const plain = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS).plans;
+  const avoid = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, avoidMorning: true }).plans;
+  assert.ok(avoid.length > 0);
+  assert.ok(avoid[0].score.stats.morningBlocks <= Math.min(...plain.map((p) => p.score.stats.morningBlocks)));
+});
+
+test('편성: 피할·이미 수강 교양은 채우지 않는다', () => {
+  const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 24 };
+  const courses = recommendedCourses(DATA, profile).slice(0, 2);
+  const first = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS).plans;
+  const majors = new Set(courses.map((c) => c.code));
+  const used = [...new Set(first.flatMap((p) => p.sections.filter((s) => !majors.has(s.code)).map((s) => s.code)))];
+  const { plans } = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS, { excludeCodes: used });
+  assert.ok(plans.length > 0);
+  for (const plan of plans) for (const s of plan.sections) assert.ok(!used.includes(s.code), s.name);
+});

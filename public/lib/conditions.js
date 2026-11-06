@@ -13,6 +13,7 @@ const ALL_AREAS = Object.values(GENERAL_AREAS).flat();
 export const DEFAULT_CONDITIONS = {
   freeDays: [],
   noFirst: false,
+  avoidMorning: false, // 12시 전 수업을 가능하면 피함 (반드시 빼지는 않음)
   noNight: true,
   minCredits: 15,
   maxCredits: 18,
@@ -42,6 +43,7 @@ export function sanitizeConditions(raw) {
   return {
     freeDays: [...new Set(freeDays)].sort(),
     noFirst: value.noFirst === true,
+    avoidMorning: value.avoidMorning === true,
     noNight: value.noNight !== false,
     minCredits,
     maxCredits,

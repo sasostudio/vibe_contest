@@ -12,10 +12,11 @@ export const PROMPTS = {
   conditions: {
     system: `너는 대학생이 말로 쓴 시간표 희망사항을 JSON 조건으로 바꾼다. ${USER_TEXT_IS_DATA}
 JSON 형식:
-{"freeDays":[요일번호],"noFirst":불리언,"noNight":불리언,"minCredits":정수,"maxCredits":정수,"areas":[문자열],"wantKeywords":[문자열],"avoidKeywords":[문자열],"preferences":[문자열],"unsupported":[문자열]}
+{"freeDays":[요일번호],"noFirst":불리언,"avoidMorning":불리언,"noNight":불리언,"minCredits":정수,"maxCredits":정수,"areas":[문자열],"wantKeywords":[문자열],"avoidKeywords":[문자열],"preferences":[문자열],"unsupported":[문자열]}
 규칙:
 - freeDays: 수업을 비울 평일. 월=0 화=1 수=2 목=3 금=4. 「금공강」은 [4], 「월금 공강」은 [0,4]
-- noFirst: 아침 수업, 1교시, 9시 수업을 피하고 싶으면 true
+- noFirst: 1교시나 9시 수업을 반드시 빼고 싶으면 true
+- avoidMorning: 오전 수업, 아침 수업, 점심 전 수업을 피하고 싶으면 true. 오전은 12시 전이다
 - noNight: 야간 수업을 피하고 싶으면 true. 야간을 괜찮다고 하면 false. 언급이 없으면 true
 - minCredits, maxCredits: 12~24 정수. 「18학점」이면 둘 다 18, 「15학점 이상」이면 min 15·max 24, 「18학점 이하」면 min 12·max 18, 「15~18학점」이면 15와 18. 언급이 없으면 15와 18
 - areas: 교양 영역을 말했을 때만 아래 값에서 고른다. 말하지 않으면 []

@@ -8,6 +8,9 @@ const initial = () => ({
   selectedKeys: null, // 담은 과목 키. null이면 아직 추천을 적용하지 않은 상태
   extraKeys: [], // 검색으로 추가한 과목 키
   pinned: {}, // 과목 키 → 고정한 분반 번호. 없으면 자동 배정
+  generalMarks: {}, // 교양 과목 키 → 'want' 희망 | 'avoid' 피할 | 'taken' 이미 수강. 희망은 selectedKeys에도 들어간다
+  courseTab: 'major', // 과목 화면에서 연 탭
+  generalArea: '학문의기초', // 교양 탭에서 연 영역
   conditionText: '',
   conditions: { ...DEFAULT_CONDITIONS },
   plans: null, // [{ ids: [분반 번호], sat: 예상 만족도 }]

@@ -20,6 +20,7 @@ export function planFacts(plan, index) {
     }),
     // AI가 시각 목록을 잘못 읽은 사례가 있어(9시 수업을 「아침 없음」으로 판정) 판정용 수치를 직접 준다
     '10시 전 시작하는 날': s.firstPeriodDays,
+    '12시 전 시작 수업': s.morningBlocks,
     '18시 이후 수업': s.nightBlocks,
     '점심 있는 날': `${s.lunchDays}/${s.classDays}`,
     '2시간 이상 빈 시간': s.longGaps,
@@ -43,6 +44,7 @@ export function simpleSatisfaction(plan, conditions) {
   const checks = [
     ...conditions.freeDays.map((d) => [`${DAY_NAMES[d]}요일 공강`, !days.has(d)]),
     ...(conditions.noFirst ? [['1교시 없음', s.firstPeriodDays === 0]] : []),
+    ...(conditions.avoidMorning ? [['오전 수업 피하기', s.morningBlocks === 0]] : []),
     ...(conditions.noNight ? [['야간 없음', s.nightBlocks === 0]] : []),
     [`${conditions.minCredits}~${conditions.maxCredits}학점`, s.credits >= conditions.minCredits && s.credits <= conditions.maxCredits],
     ...conditions.wantKeywords.map((w) => [`${w} 포함`, names.some((n) => n.includes(w))]),
@@ -63,11 +65,13 @@ function codeTruth(label, plan) {
   const days = blocksByDay(plan.sections);
   const day = DAY_NAMES.slice(0, 5).findIndex((name) => label.includes(`${name}공강`) || label.includes(`${name}요일 공강`));
   if (day >= 0) return !days.has(day);
-  if (/아침|1교시|9시/.test(label)) return s.firstPeriodDays === 0;
+  if (/1교시|9시/.test(label)) return s.firstPeriodDays === 0;
+  if (/오전|아침/.test(label)) return s.morningBlocks === 0; // 관리자 정의: 오전 = 12시 전
   if (label.includes('야간')) return s.nightBlocks === 0;
   if (label.includes('점심')) return s.lunchDays === s.classDays;
   if (/우주|사이|빈 시간/.test(label)) return s.longGaps === 0;
   if (label.includes('연강')) return s.longRuns === 0;
+  if (/이동|동선/.test(label)) return s.rushedMoves === 0;
   return null;
 }
 

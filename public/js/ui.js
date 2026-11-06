@@ -24,7 +24,8 @@ export function hourRange(plans) {
   };
 }
 
-export function timetableGrid(sections, range = hourRange([sections])) {
+// marks: 분반 번호 → 덧붙일 클래스 (미리보기 'ghost', 겹침 'clash')
+export function timetableGrid(sections, range = hourRange([sections]), marks = {}) {
   const hasSaturday = sections.some((s) => s.slots.some((slot) => slot[0] === 5));
   const days = hasSaturday ? [...WEEKDAYS, 5] : WEEKDAYS;
   const height = (range.to - range.from) * PIXELS_PER_HOUR;
@@ -37,7 +38,7 @@ export function timetableGrid(sections, range = hourRange([sections])) {
   const columns = days.map((day) => {
     const blocks = sections.flatMap((s) => s.slots.filter((slot) => slot[0] === day).map((slot) => {
       const label = `${s.name} ${DAY_NAMES[day]} ${formatTime(slot[1])}~${formatTime(slot[2])} ${slot[3]}`;
-      return `<div class="class ${color.get(s.id)}" title="${esc(label)}" style="top:${toY(slot[1])}px;height:${toY(slot[2]) - toY(slot[1])}px">${esc(s.name)}<small>${esc(slot[3])}</small></div>`;
+      return `<div class="class ${color.get(s.id)} ${marks[s.id] ?? ''}" title="${esc(label)}" style="top:${toY(slot[1])}px;height:${toY(slot[2]) - toY(slot[1])}px">${esc(s.name)}<small>${esc(slot[3])}</small></div>`;
     }));
     return `<div class="grid-day${blocks.length ? '' : ' free'}">${blocks.join('')}</div>`;
   }).join('');

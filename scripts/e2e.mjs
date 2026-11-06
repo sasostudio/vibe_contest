@@ -50,31 +50,48 @@ const checked = await page.locator('#course-area input[type=checkbox]:checked').
 check('추천 과목이 기본 체크됨', checked > 0, `${checked}개`);
 const sectionText = await page.textContent('table.sections');
 check('분반별 시간과 강의실 표시', /\d\d:\d\d~\d\d:\d\d \(/.test(sectionText));
+const before = await page.locator('#preview .class').count();
 await page.locator('[data-pin-key]').nth(1).check();
-check('분반 고정이 담은 과목에 표시', (await page.textContent('#cart')).includes('분반 고정'));
+check('분반 고정이 실시간 시간표에 반영', (await page.locator('#preview .class').count()) > before);
+await page.hover('tr[data-section] >> nth=4');
+check('마우스 올린 분반 미리보기', (await page.locator('#preview .class.ghost').count()) > 0);
 await page.locator('[data-pin-key][value=""]').first().check();
 await shot(page, '02-courses');
+await page.click('[data-tab=general]');
+await page.click('[data-area="(핵심)인문"]');
+const generalRows = await page.locator('#tab-body [data-mark-key]').count();
+check('교양 탭에 영역 과목 전체 표시', generalRows >= 4 * 10, `선택 버튼 ${generalRows}개`);
+const wantName = await page.locator('#tab-body tr.course-head b').first().textContent();
+await page.locator('#tab-body [data-mark-key][value="want"]').first().check();
+check('희망 교양이 담은 과목에 추가', (await page.textContent('#preview')).includes(wantName), wantName);
+await page.locator('#tab-body [data-mark-key][value="avoid"]').nth(1).check();
+await page.locator('#tab-body [data-mark-key][value="taken"]').nth(2).check();
+const counts = await page.textContent('#preview');
+check('피할·이미 수강 개수 표시', counts.includes('피할 교양 1') && counts.includes('이미 수강 1'));
+await shot(page, '02b-general');
+await page.locator('#tab-body [data-mark-key][value=""]').first().check();
+await page.click('[data-tab=major]');
 
 await page.click('#next');
 await page.waitForSelector('#wish');
 await page.fill('#wish', '금공강이면 좋겠고 아침 수업은 싫어. 15학점 듣고 싶어. 그리고 학점 잘 주는 교수님 수업으로.');
 await page.click('#to-conditions');
-await page.waitForFunction(() => /정리했습니다|실패했습니다/.test(document.querySelector('#ai-status').textContent), null, { timeout: 20000 });
+await page.waitForFunction(() => /더했습니다|실패했습니다/.test(document.querySelector('#ai-status').textContent), null, { timeout: 20000 });
 const aiStatus = await page.textContent('#ai-status');
-check('AI 조건 변환 성공', aiStatus.includes('정리했습니다'), aiStatus);
+check('AI 조건 변환 성공', aiStatus.includes('더했습니다'), aiStatus);
 check('금요일 공강 반영', await page.isChecked('[data-day="4"]'));
-check('1교시 제외 반영', await page.isChecked('#no-first'));
+check('아침 수업 → 오전 피하기 반영', await page.isChecked('#avoid-morning'));
+check('버튼에도 같은 값 표시', (await page.getAttribute('[data-q-flag="avoidMorning"]', 'aria-pressed')) === 'true');
+await page.click('[data-q-day="2"]');
+check('버튼을 누르면 세부 조건에 반영', await page.isChecked('[data-day="2"]'));
+await page.click('[data-q-day="2"]');
 check('학점 15 반영', (await page.inputValue('#min-credits')) === '15' && (await page.inputValue('#max-credits')) === '15');
 check('처리 불가 요청 분리', (await page.textContent('#extra')).includes('해결할 수 없는'), (await page.textContent('#extra')).slice(0, 80));
 await shot(page, '03-conditions');
 
 await page.click('#run');
-// 컴퓨터공학부 2학년 알고리즘은 금공강과 1교시 제외를 함께 만족하는 분반이 없다. 실제 자료 기준의 정답이다.
-await page.waitForSelector('text=편성 불가 통지', { timeout: 15000 });
-check('실제 자료로 불가능한 조건 판정', (await page.textContent('#view')).includes('알고리즘'));
-await page.click('[data-fix] >> text=1교시 허용');
-await page.waitForSelector('.plan', { timeout: 15000 });
-check('대안 버튼으로 바로 재편성', true);
+// 오전 피하기는 반드시 지키는 조건이 아니라서 금공강과 함께여도 편성된다
+await page.waitForSelector('.plan', { timeout: 30000 });
 const planCount = await page.locator('.plan').count();
 check('시간표 안 생성', planCount >= 1, `${planCount}안`);
 const firstNote = await page.textContent('.plan-note');

@@ -71,7 +71,19 @@ td.mid, th.mid { text-align: center; white-space: nowrap; }
 tr.mine td { background: var(--note); font-weight: 700; }
 tr.pending td { color: var(--mute); }
 .form th { width: 118px; }
-.sections { min-width: 760px; }
+.sections { min-width: 720px; }
+.course-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
+.preview { position: sticky; top: 8px; }
+.tabs { display: flex; gap: 2px; }
+.tab { padding: 5px 16px; border: 1px solid var(--navy); border-bottom: 0; background: var(--face); font: 700 13px var(--body); cursor: pointer; }
+.tab[aria-selected='true'] { background: var(--navy); color: #fff; }
+.tab-body { margin-top: 0; }
+.tab-body .row + .row { margin-top: 4px; }
+.class.ghost { opacity: 0.75; border: 2px dashed var(--navy); }
+.class.clash { border: 2px solid #d00; }
+.clash-note { color: #b00; font-weight: 700; }
+.chip { margin: 2px 4px 2px 0; font-weight: 400; }
+.chip[aria-pressed='true'] { border-style: inset; background: var(--blue); color: #fff; font-weight: 700; }
 .sections tr.course-head td { border-top: 2px solid var(--navy); }
 .sections td label.check { margin-right: 0; }
 .plan-note ul { margin: 3px 0 0; padding-left: 16px; }
@@ -152,6 +164,8 @@ label.check { display: inline-block; margin-right: 12px; white-space: nowrap; }
 
 @media (max-width: 1020px) {
   .plans { grid-template-columns: minmax(0, 1fr); }
+  .course-layout { grid-template-columns: minmax(0, 1fr); }
+  .preview { position: static; }
   .split { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {

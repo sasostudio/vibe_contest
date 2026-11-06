@@ -1,6 +1,6 @@
 // 시간표 조합 탐색과 실패 진단. AI는 여기 관여하지 않는다.
 import { DAY_NAMES, courseKey, sectionsConflict, totalCredits } from './timetable.js';
-import { scoreTimetable } from './score.js';
+import { MORNING_END, scoreTimetable } from './score.js';
 
 const FIRST_PERIOD_END = 10 * 60;
 const NIGHT_START = 18 * 60;
@@ -101,11 +101,16 @@ function searchCombinations(courses, conditions) {
   return results;
 }
 
-function generalPool(data, { dept, year }, conditions) {
+const hasMorning = (section) => section.slots.some((slot) => slot[1] < MORNING_END);
+const morningCount = (sections) => sections.reduce((n, s) => n + s.slots.filter((slot) => slot[1] < MORNING_END).length, 0);
+
+// excludeCodes: 사용자가 「피할」 또는 「이미 수강」으로 고른 교양의 과목번호
+function generalPool(data, { dept, year }, conditions, excludeCodes) {
   const avoid = conditions.avoidKeywords;
   return data.courses.filter(
     (c) =>
       GENERAL_TYPES.has(c.type) &&
+      !excludeCodes.has(c.code) &&
       (conditions.areas.length === 0 || conditions.areas.includes(c.area)) &&
       c.slots.length > 0 &&
       gradeMatches(c, year) &&
@@ -117,16 +122,18 @@ function generalPool(data, { dept, year }, conditions) {
 
 // 희망 키워드 과목을 먼저 담고, 최소 학점까지는 점수가 가장 오르는 교양을 채운다.
 // 최소 학점을 넘은 뒤에는 총점이 오를 때만 최대 학점까지 더 담는다. banned는 다른 안에서 쓴 교양이다.
+// 오전 수업 피하기가 켜져 있으면 오전 교양은 최소 학점을 못 채울 때만 쓴다.
 function fillWithGeneral(base, pool, conditions, banned = new Set()) {
   const plan = [...base];
+  const preferred = conditions.avoidMorning ? pool.filter((c) => !hasMorning(c)) : pool;
   const canAdd = (c) =>
     !banned.has(c.id) &&
     !plan.some((p) => p.code === c.code || sectionsConflict(p, c)) &&
     totalCredits(plan) + c.credits <= conditions.maxCredits;
-  const bestAddition = () => {
+  const bestAddition = (from = preferred) => {
     let best = null;
     let bestScore = -1;
-    for (const candidate of pool) {
+    for (const candidate of from) {
       if (!canAdd(candidate)) continue;
       const score = scoreTimetable([...plan, candidate]).total;
       if (score > bestScore) {
@@ -142,7 +149,7 @@ function fillWithGeneral(base, pool, conditions, banned = new Set()) {
     if (wanted) plan.push(wanted);
   }
   while (totalCredits(plan) < conditions.minCredits) {
-    const next = bestAddition();
+    const next = bestAddition() ?? bestAddition(pool);
     if (!next) break;
     plan.push(next.section);
   }
@@ -184,13 +191,15 @@ function pickDistinct(ranked) {
   return chosen;
 }
 
-function buildPlans(data, profile, courses, conditions) {
+function buildPlans(data, profile, courses, conditions, excludeCodes) {
   const bases = searchCombinations(courses, conditions);
   if (bases.length === 0) return [];
-  const pool = generalPool(data, profile, conditions);
+  const pool = generalPool(data, profile, conditions, excludeCodes);
+  // 오전 수업 피하기는 반드시 지키는 조건이 아니라, 오전 수업이 적은 전공 조합을 먼저 고르는 방식이다
+  const morningFirst = (a, b) => (conditions.avoidMorning ? a.morning - b.morning : 0) || b.total - a.total;
   const top = bases
-    .map((sections) => ({ sections, total: scoreTimetable(sections).total }))
-    .sort((a, b) => b.total - a.total)
+    .map((sections) => ({ sections, total: scoreTimetable(sections).total, morning: morningCount(sections) }))
+    .sort(morningFirst)
     .slice(0, FILL_BASES);
   const unique = new Map();
   for (const { sections } of top) {
@@ -199,7 +208,8 @@ function buildPlans(data, profile, courses, conditions) {
       if (!unique.has(key)) unique.set(key, { sections: filled, score: scoreTimetable(filled) });
     }
   }
-  const ranked = [...unique.values()].sort((a, b) => b.score.total - a.score.total);
+  const ranked = [...unique.values()].sort((a, b) =>
+    (conditions.avoidMorning ? a.score.stats.morningBlocks - b.score.stats.morningBlocks : 0) || b.score.total - a.score.total);
   return pickDistinct(ranked);
 }
 
@@ -243,7 +253,7 @@ export function diagnose(courses, conditions) {
 }
 
 // 반환: { plans, diagnosis }. plans는 총점순 후보 최대 12개이며, 비어 있으면 diagnosis를 보여 준다.
-export function generatePlans(data, profile, courses, conditions) {
+export function generatePlans(data, profile, courses, conditions, { excludeCodes = [] } = {}) {
   const maxCredits = Math.min(conditions.maxCredits, profile.creditCap);
   const credits = courses.reduce((sum, c) => sum + c.credits, 0);
   if (credits > maxCredits) {
@@ -253,7 +263,7 @@ export function generatePlans(data, profile, courses, conditions) {
     };
   }
   const limited = { ...conditions, maxCredits, minCredits: Math.min(conditions.minCredits, maxCredits) };
-  const plans = buildPlans(data, profile, courses, limited);
+  const plans = buildPlans(data, profile, courses, limited, new Set(excludeCodes));
   if (plans.length > 0) return { plans, diagnosis: null };
   return { plans: [], diagnosis: diagnose(courses, limited) };
 }

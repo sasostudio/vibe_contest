@@ -1,101 +1,174 @@
-// 3번 화면. 추천 과목과 분반별 시간·강의실을 보고 담거나 빼고, 원하면 분반을 고정한다.
+// 3번 화면. 왼쪽에서 전공·교양을 고르고 오른쪽 시간표에서 바로 확인한다.
+// 탭: 추천 전공(담기) / 교양(희망·피할·이미 수강) / 과목 검색(담기). 분반 고정은 모든 탭에서 가능하다.
 import { DATA } from '../../data/courses.js';
+import { GENERAL_AREAS } from '../../lib/conditions.js';
 import { defaultSelection, groupCourses, recommendedCourses, searchCourses, targetAllows } from '../../lib/planner.js';
-import { DAY_NAMES, courseKey, formatTime } from '../../lib/timetable.js';
-import { esc, pathLine, showAlert, win } from '../ui.js';
+import { DAY_NAMES, courseKey, formatTime, sectionsConflict } from '../../lib/timetable.js';
+import { esc, pathLine, showAlert, timetableGrid, win } from '../ui.js';
 import { save, state } from '../state.js';
+
+const GENERAL_TYPES = Object.keys(GENERAL_AREAS);
+const MARKS = [['', '상관없음'], ['want', '희망'], ['avoid', '피할'], ['taken', '이미 수강']];
+const sectionById = new Map(DATA.courses.map((c) => [c.id, c]));
 
 export function coursesByKeys(keys) {
   const wanted = new Set(keys);
   return groupCourses(DATA.courses.filter((c) => wanted.has(courseKey(c))));
 }
 
+// 편성에서 빼야 할 교양 과목번호 (피할, 이미 수강)
+export const excludedGeneralCodes = () => Object.entries(state.generalMarks)
+  .filter(([, mark]) => mark === 'avoid' || mark === 'taken')
+  .map(([key]) => key.split('|')[0]);
+
 const sectionNo = (section) => section.id.slice(-3);
 const sectionTime = (section) => (section.slots.length
   ? section.slots.map(([d, s, e, room]) => `${DAY_NAMES[d]} ${formatTime(s)}~${formatTime(e)} (${room})`).join(' / ')
   : `시간 없음 (${section.mode})`);
 
-// 과목 하나 = 자동 배정 줄 + 분반 줄들. 과목 정보 칸은 세로로 합친다.
-function courseRows(course) {
-  const checked = state.selectedKeys.includes(course.key);
+// ── 목록 표 ──────────────────────────────────────────────
+function pinCell(course, value, label) {
   const pinned = state.pinned[course.key] ?? '';
+  return `<label class="check"><input type="radio" name="pin-${esc(course.key)}" data-pin-key="${esc(course.key)}" value="${esc(value)}"${pinned === value ? ' checked' : ''}>${label}</label>`;
+}
+
+function chooseCell(course, isGeneral) {
+  if (!isGeneral) {
+    const checked = state.selectedKeys.includes(course.key);
+    return `<input type="checkbox" data-key="${esc(course.key)}" aria-label="${esc(course.name)} 담기"${checked ? ' checked' : ''}>`;
+  }
+  const current = state.generalMarks[course.key] ?? '';
+  return MARKS.map(([value, label]) =>
+    `<label class="check"><input type="radio" name="mark-${esc(course.key)}" data-mark-key="${esc(course.key)}" value="${value}"${current === value ? ' checked' : ''}>${label}</label>`).join('<br>');
+}
+
+function courseRows(course) {
+  const isGeneral = GENERAL_TYPES.includes(course.type);
   const needsCheck = course.sections.some((s) => !targetAllows(s, state.profile.dept));
   const span = course.sections.length + 1;
-  const pin = (value, label) =>
-    `<label class="check"><input type="radio" name="pin-${esc(course.key)}" data-pin-key="${esc(course.key)}" value="${esc(value)}"${pinned === value ? ' checked' : ''}>${label}</label>`;
   const head = `<tr class="course-head">
-    <td class="mid" rowspan="${span}"><input type="checkbox" data-key="${esc(course.key)}" aria-label="${esc(course.name)} 담기"${checked ? ' checked' : ''}></td>
-    <td rowspan="${span}"><b>${esc(course.name)}</b>${needsCheck ? ' <span class="tag">수강대상 확인</span>' : ''}<br><span class="hint">${esc(course.dept)}</span></td>
+    <td class="${isGeneral ? '' : 'mid'}" rowspan="${span}">${chooseCell(course, isGeneral)}</td>
+    <td rowspan="${span}"><b>${esc(course.name)}</b>${needsCheck ? ' <span class="tag">수강대상 확인</span>' : ''}<br><span class="hint">${esc(isGeneral ? course.area : course.dept)} · ${esc(course.grade)}${course.grade === '전학년' ? '' : '학년'}</span></td>
     <td rowspan="${span}">${esc(course.type)}</td>
     <td class="num" rowspan="${span}">${course.credits}</td>
     <td colspan="3" class="hint">분반 ${course.sections.length}개</td>
-    <td>${pin('', '자동 배정')}</td>
+    <td>${pinCell(course, '', '자동 배정')}</td>
   </tr>`;
-  const rows = course.sections.map((s) => `<tr>
+  const rows = course.sections.map((s) => `<tr data-section="${esc(s.id)}">
     <td class="mid">${sectionNo(s)}</td>
     <td>${esc(sectionTime(s))}</td>
     <td class="num">${s.cap ? `${s.cap}명` : '-'}</td>
-    <td>${pin(s.id, '이 분반 고정')}</td>
+    <td>${pinCell(course, s.id, '이 분반 고정')}</td>
   </tr>`).join('');
   return head + rows;
 }
 
-const tableOf = (courses) => `<div class="scroll"><table class="sections">
-  <thead><tr><th class="mid">담기</th><th>교과목명</th><th>이수구분</th><th class="num">학점</th><th class="mid">분반</th><th>요일·시간 (강의실)</th><th class="num">정원</th><th>배정</th></tr></thead>
+const tableOf = (courses, chooseLabel = '담기') => `<div class="scroll"><table class="sections">
+  <thead><tr><th>${chooseLabel}</th><th>교과목명</th><th>이수구분</th><th class="num">학점</th><th class="mid">분반</th><th>요일·시간 (강의실)</th><th class="num">정원</th><th>배정</th></tr></thead>
   <tbody>${courses.map(courseRows).join('')}</tbody></table></div>`;
 
-function cartHtml() {
-  const picked = coursesByKeys(state.selectedKeys);
-  if (picked.length === 0) return '<p class="hint">담은 과목이 없습니다. 남은 학점은 모두 교양으로 채웁니다.</p>';
-  const sum = picked.reduce((total, c) => total + c.credits, 0);
-  const rows = picked.map((c) => {
-    const pinned = c.sections.find((s) => s.id === state.pinned[c.key]);
-    return `<tr><td>${esc(c.name)}</td><td>${esc(c.type)}</td><td class="num">${c.credits}</td>
-      <td>${pinned ? `${sectionNo(pinned)}분반 고정: ${esc(sectionTime(pinned))}` : '자동 배정'}</td>
-      <td class="mid"><button class="btn" data-remove="${esc(c.key)}">취소</button></td></tr>`;
-  }).join('');
-  return `<div class="scroll"><table><thead><tr><th>교과목명</th><th>이수구분</th><th class="num">학점</th><th>배정</th><th class="mid">취소</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>
-    <p><b>담은 과목 ${sum}학점 / 학적 상한 ${state.profile.creditCap}학점</b></p>`;
+// ── 탭 내용 ──────────────────────────────────────────────
+function majorTab(recommended) {
+  const extras = coursesByKeys(state.extraKeys).filter((c) => !recommended.some((r) => r.key === c.key) && !GENERAL_TYPES.includes(c.type));
+  const listed = [...recommended, ...extras];
+  return `<p class="hint">시간표 자료에 필수 여부가 없어 「추천 과목」으로 표시합니다. 이미 들은 과목은 체크를 해제하십시오. 담은 과목은 반드시 포함됩니다.</p>
+    ${recommended.length ? '' : '<div class="box-note">이 학과·학년의 추천 전공을 찾지 못했습니다. 「과목 검색」 탭에서 담으십시오.</div>'}
+    ${listed.length ? tableOf(listed) : ''}`;
 }
 
+function generalTab() {
+  const areaButtons = Object.entries(GENERAL_AREAS).map(([type, areas]) =>
+    `<div class="row"><span class="tag">${type}</span>${areas.map((a) =>
+      `<button class="btn${a === state.generalArea ? ' btn-go' : ''}" data-area="${esc(a)}">${esc(a.replace('(핵심)', ''))}</button>`).join('')}</div>`).join('');
+  const courses = groupCourses(DATA.courses.filter((c) => GENERAL_TYPES.includes(c.type) && c.area === state.generalArea))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return `${areaButtons}
+    <p class="hint">희망은 반드시 넣고, 피할·이미 수강은 넣지 않습니다. 상관없음인 교양은 남은 학점을 채울 때 후보가 됩니다. ${esc(state.generalArea)} 과목 ${courses.length}개.</p>
+    ${tableOf(courses, '선택')}`;
+}
+
+function searchTab(query) {
+  const hits = query ? searchCourses(DATA, query, 15) : [];
+  return `<form class="row" id="search-form">
+      <label for="query">교과목명</label><input id="query" type="search" placeholder="예: 빅데이터" value="${esc(query)}">
+      <button class="btn" type="submit">검색</button>
+    </form>
+    ${query && !hits.length ? '<p class="hint">이번 학기에 개설된 과목 중 찾지 못했습니다. 과목 이름의 일부만 입력해 보십시오.</p>' : ''}
+    ${hits.length ? tableOf(hits, '선택') : ''}`;
+}
+
+// ── 오른쪽: 실시간 시간표와 담은 과목 ───────────────────────
+// 위치가 정해진 분반만 격자에 그린다: 고정한 분반, 분반이 하나뿐인 과목
+function placedSections() {
+  return coursesByKeys(state.selectedKeys).flatMap((c) => {
+    const pinned = c.sections.find((s) => s.id === state.pinned[c.key]);
+    if (pinned) return [pinned];
+    return c.sections.length === 1 ? c.sections : [];
+  });
+}
+
+function previewHtml(hoverId) {
+  const placed = placedSections();
+  const hover = sectionById.get(hoverId);
+  const showHover = hover && !placed.some((s) => s.id === hover.id);
+  const sections = showHover ? [...placed, hover] : placed;
+  const marks = {};
+  if (showHover) marks[hover.id] = placed.some((s) => sectionsConflict(s, hover)) ? 'ghost clash' : 'ghost';
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      if (sectionsConflict(placed[i], placed[j])) marks[placed[i].id] = marks[placed[j].id] = 'clash';
+    }
+  }
+  const picked = coursesByKeys(state.selectedKeys);
+  const floating = picked.filter((c) => !placed.some((s) => courseKey(s) === c.key));
+  const sum = picked.reduce((total, c) => total + c.credits, 0);
+  const count = (mark) => Object.values(state.generalMarks).filter((m) => m === mark).length;
+  const rows = picked.map((c) => `<tr><td>${esc(c.name)}</td><td class="num">${c.credits}</td>
+    <td class="mid"><button class="btn" data-remove="${esc(c.key)}">취소</button></td></tr>`).join('');
+  return `${timetableGrid(sections, undefined, marks)}
+    ${Object.values(marks).includes('clash') || marks[hover?.id]?.includes('clash') ? '<p class="clash-note">빨간 테두리: 시간이 겹칩니다.</p>' : ''}
+    ${floating.length ? `<p class="hint">자동 배정(편성 때 분반 결정): ${floating.map((c) => esc(c.name)).join(', ')}</p>` : ''}
+    <p><b>담은 과목 ${sum}학점</b> / 학적 상한 ${state.profile.creditCap}학점 · 피할 교양 ${count('avoid')} · 이미 수강 ${count('taken')}</p>
+    ${picked.length ? `<div class="scroll"><table><tbody>${rows}</tbody></table></div>` : ''}`;
+}
+
+// ── 화면 ────────────────────────────────────────────────
 export function showCourses(view) {
   if (!state.profile) {
     location.hash = '#/profile';
     return;
   }
   state.pinned ??= {};
+  state.generalMarks ??= {};
+  state.courseTab ??= 'major';
+  state.generalArea ??= '학문의기초';
   const recommended = recommendedCourses(DATA, state.profile);
   if (state.selectedKeys === null) {
     state.selectedKeys = defaultSelection(recommended, state.conditions).map((c) => c.key);
     save();
   }
-  const extras = coursesByKeys(state.extraKeys).filter((c) => !recommended.some((r) => r.key === c.key));
-  const listed = [...recommended, ...extras];
-  const emptyNote = recommended.length === 0
-    ? '<div class="box-note">이번 학기 시간표에서 이 학과·학년의 추천 전공을 찾지 못했습니다. 아래에서 과목을 검색해 담으십시오.</div>'
-    : '';
+  let query = '';
+  const TABS = [['major', '추천 전공'], ['general', '교양'], ['search', '과목 검색']];
 
   view.innerHTML = `${pathLine('시간표 편성 신청', '과목 확인')}
-    <div id="course-area">
-    ${win(`${state.profile.dept} ${state.profile.year}학년 추천 과목`, `
-      <p class="hint">시간표 자료에 필수 여부가 없어 「추천 과목」으로 표시합니다. 이미 들은 과목은 체크를 해제하십시오. 담은 과목은 반드시 포함되고, 꼭 들어야 하는 분반이 있으면 「이 분반 고정」을 고르십시오.</p>
-      ${emptyNote}
-      ${listed.length ? tableOf(listed) : ''}`)}
-    ${win('과목 검색 추가', `
-      <form class="row" id="search-form">
-        <label for="query">교과목명</label><input id="query" type="search" placeholder="예: 빅데이터">
-        <button class="btn" type="submit">검색</button>
-      </form>
-      <div id="search-result"></div>`)}
-    ${win('담은 과목', '<div id="cart"></div>')}
+    <div class="course-layout">
+      <div id="course-area">
+        <div class="tabs" role="tablist">${TABS.map(([key, label]) => `<button class="tab" role="tab" data-tab="${key}">${label}</button>`).join('')}</div>
+        <div class="win tab-body"><div class="win-body" id="tab-body"></div></div>
+      </div>
+      <aside class="preview">${win('내 시간표 (실시간)', '<div id="preview"></div>')}</aside>
     </div>
     <div class="row row-end"><a class="btn" href="#/profile">이전</a><button class="btn btn-go" id="next">다음: 조건 접수</button></div>`;
 
   const area = view.querySelector('#course-area');
-  const paintCart = () => { area.querySelector('#cart').innerHTML = cartHtml(); };
-  const syncChecks = () => {
-    for (const box of area.querySelectorAll('[data-key]')) box.checked = state.selectedKeys.includes(box.dataset.key);
+  const previewBox = view.querySelector('#preview');
+  const paintPreview = (hoverId) => { previewBox.innerHTML = previewHtml(hoverId); };
+  const paintTab = () => {
+    for (const tab of area.querySelectorAll('[data-tab]')) tab.setAttribute('aria-selected', String(tab.dataset.tab === state.courseTab));
+    const body = area.querySelector('#tab-body');
+    if (state.courseTab === 'general') body.innerHTML = generalTab();
+    else if (state.courseTab === 'search') body.innerHTML = searchTab(query);
+    else body.innerHTML = majorTab(recommended);
   };
   const setSelected = (key, on) => {
     state.selectedKeys = state.selectedKeys.filter((k) => k !== key);
@@ -105,32 +178,62 @@ export function showCourses(view) {
     }
     state.plans = null;
     save();
-    syncChecks();
-    paintCart();
   };
-  paintCart();
+  // 교양의 상태를 바꾼다. 희망만 담기 목록에 넣고, 나머지는 빼면서 분반 고정도 푼다
+  const setMark = (key, mark) => {
+    if (mark) state.generalMarks[key] = mark;
+    else delete state.generalMarks[key];
+    if (mark !== 'want') delete state.pinned[key];
+    setSelected(key, mark === 'want');
+  };
+  const isGeneralKey = (key) => coursesByKeys([key]).some((c) => GENERAL_TYPES.includes(c.type));
+  paintTab();
+  paintPreview();
 
   // view는 화면끼리 공유하므로 리스너는 이 화면의 내용에만 건다
+  area.addEventListener('click', (event) => {
+    const { tab, area: areaName } = event.target.dataset ?? {};
+    if (tab) state.courseTab = tab;
+    if (areaName) state.generalArea = areaName;
+    if (tab || areaName) {
+      save();
+      paintTab();
+    }
+  });
   area.addEventListener('change', (event) => {
-    const { key, pinKey } = event.target.dataset ?? {};
+    const { key, pinKey, markKey } = event.target.dataset ?? {};
     if (key) setSelected(key, event.target.checked);
+    if (markKey) setMark(markKey, event.target.value);
     if (pinKey) {
       if (event.target.value) state.pinned[pinKey] = event.target.value;
       else delete state.pinned[pinKey];
-      setSelected(pinKey, true);
+      if (isGeneralKey(pinKey)) setMark(pinKey, 'want');
+      else setSelected(pinKey, true);
+    }
+    if (key || markKey || pinKey) {
+      paintTab();
+      paintPreview();
     }
   });
-  area.addEventListener('click', (event) => {
-    const removeKey = event.target.dataset?.remove;
-    if (removeKey) setSelected(removeKey, false);
-  });
-
-  view.querySelector('#search-form').addEventListener('submit', (event) => {
+  area.addEventListener('submit', (event) => {
     event.preventDefault();
-    const hits = searchCourses(DATA, view.querySelector('#query').value, 15);
-    view.querySelector('#search-result').innerHTML = hits.length
-      ? tableOf(hits)
-      : '<p class="hint">이번 학기에 개설된 과목 중 찾지 못했습니다. 과목 이름의 일부만 입력해 보십시오.</p>';
+    query = area.querySelector('#query').value.trim();
+    paintTab();
+  });
+  area.addEventListener('mouseover', (event) => {
+    const row = event.target.closest('tr[data-section]');
+    if (row) paintPreview(row.dataset.section);
+  });
+  area.addEventListener('mouseleave', () => paintPreview());
+  previewBox.addEventListener('click', (event) => {
+    const key = event.target.dataset?.remove;
+    if (!key) return;
+    if (state.generalMarks[key]) setMark(key, '');
+    else setSelected(key, false);
+    delete state.pinned[key];
+    save();
+    paintTab();
+    paintPreview();
   });
 
   view.querySelector('#next').addEventListener('click', () => {
