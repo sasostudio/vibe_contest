@@ -1,13 +1,14 @@
 // 시간표 조합 탐색과 실패 진단. AI는 여기 관여하지 않는다.
 import { DAY_NAMES, courseKey, sectionsConflict, totalCredits } from './timetable.js';
-import { MAX_CREDITS, scoreTimetable } from './score.js';
+import { scoreTimetable } from './score.js';
 
 const FIRST_PERIOD_END = 10 * 60;
 const NIGHT_START = 18 * 60;
 const MAX_BASES = 200;
 const MAX_NODES = 40000;
 const FILL_BASES = 12;
-const PLAN_COUNT = 3;
+const FILL_VARIANTS = 3; // 같은 전공 조합에 교양을 다르게 채운 안의 수
+export const CANDIDATE_COUNT = 12;
 
 const MAJOR_TYPES = ['전공기초', '전공핵심', '전공심화'];
 const GENERAL_TYPES = new Set(['핵심교양', '심화교양', '기초교양']);
@@ -105,6 +106,7 @@ function generalPool(data, { dept, year }, conditions) {
   return data.courses.filter(
     (c) =>
       GENERAL_TYPES.has(c.type) &&
+      (conditions.areas.length === 0 || conditions.areas.includes(c.area)) &&
       c.slots.length > 0 &&
       gradeMatches(c, year) &&
       targetAllows(c, dept) &&
@@ -113,18 +115,15 @@ function generalPool(data, { dept, year }, conditions) {
   );
 }
 
-// 희망 키워드 과목을 먼저 담고, 남은 학점은 점수가 가장 오르는 교양으로 채운다.
-function fillWithGeneral(base, pool, conditions) {
+// 희망 키워드 과목을 먼저 담고, 최소 학점까지는 점수가 가장 오르는 교양을 채운다.
+// 최소 학점을 넘은 뒤에는 총점이 오를 때만 최대 학점까지 더 담는다. banned는 다른 안에서 쓴 교양이다.
+function fillWithGeneral(base, pool, conditions, banned = new Set()) {
   const plan = [...base];
   const canAdd = (c) =>
+    !banned.has(c.id) &&
     !plan.some((p) => p.code === c.code || sectionsConflict(p, c)) &&
-    totalCredits(plan) + c.credits <= Math.min(MAX_CREDITS, conditions.targetCredits + 1);
-
-  for (const word of conditions.wantKeywords) {
-    const wanted = pool.find((c) => c.name.includes(word) && canAdd(c));
-    if (wanted) plan.push(wanted);
-  }
-  while (totalCredits(plan) < conditions.targetCredits) {
+    totalCredits(plan) + c.credits <= conditions.maxCredits;
+  const bestAddition = () => {
     let best = null;
     let bestScore = -1;
     for (const candidate of pool) {
@@ -135,10 +134,33 @@ function fillWithGeneral(base, pool, conditions) {
         bestScore = score;
       }
     }
-    if (!best) break;
-    plan.push(best);
+    return best && { section: best, score: bestScore };
+  };
+
+  for (const word of conditions.wantKeywords) {
+    const wanted = pool.find((c) => c.name.includes(word) && canAdd(c));
+    if (wanted) plan.push(wanted);
+  }
+  while (totalCredits(plan) < conditions.minCredits) {
+    const next = bestAddition();
+    if (!next) break;
+    plan.push(next.section);
+  }
+  for (let next = bestAddition(); next && next.score > scoreTimetable(plan).total; next = bestAddition()) {
+    plan.push(next.section);
   }
   return plan;
+}
+
+function fillVariants(base, pool, conditions) {
+  const banned = new Set();
+  const variants = [];
+  for (let i = 0; i < FILL_VARIANTS; i++) {
+    const plan = fillWithGeneral(base, pool, conditions, banned);
+    variants.push(plan);
+    for (const section of plan.slice(base.length)) banned.add(section.id);
+  }
+  return variants;
 }
 
 const freeDayKey = (sections) =>
@@ -152,11 +174,11 @@ function pickDistinct(ranked) {
       return freeDayKey(c.sections) !== freeDayKey(plan.sections) || plan.sections.length - shared >= 2;
     });
   for (const plan of ranked) {
-    if (chosen.length === PLAN_COUNT) break;
+    if (chosen.length === CANDIDATE_COUNT) break;
     if (isDistinct(plan)) chosen.push(plan);
   }
   for (const plan of ranked) {
-    if (chosen.length === PLAN_COUNT) break;
+    if (chosen.length === CANDIDATE_COUNT) break;
     if (!chosen.includes(plan)) chosen.push(plan);
   }
   return chosen;
@@ -170,12 +192,14 @@ function buildPlans(data, profile, courses, conditions) {
     .map((sections) => ({ sections, total: scoreTimetable(sections).total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, FILL_BASES);
-  const ranked = top
-    .map(({ sections }) => {
-      const filled = fillWithGeneral(sections, pool, conditions);
-      return { sections: filled, score: scoreTimetable(filled) };
-    })
-    .sort((a, b) => b.score.total - a.score.total);
+  const unique = new Map();
+  for (const { sections } of top) {
+    for (const filled of fillVariants(sections, pool, conditions)) {
+      const key = filled.map((s) => s.id).sort().join();
+      if (!unique.has(key)) unique.set(key, { sections: filled, score: scoreTimetable(filled) });
+    }
+  }
+  const ranked = [...unique.values()].sort((a, b) => b.score.total - a.score.total);
   return pickDistinct(ranked);
 }
 
@@ -218,16 +242,17 @@ export function diagnose(courses, conditions) {
   return { causes, fixes };
 }
 
-// 반환: { plans, diagnosis }. plans가 비어 있으면 diagnosis를 보여 준다.
+// 반환: { plans, diagnosis }. plans는 총점순 후보 최대 12개이며, 비어 있으면 diagnosis를 보여 준다.
 export function generatePlans(data, profile, courses, conditions) {
+  const maxCredits = Math.min(conditions.maxCredits, profile.creditCap);
   const credits = courses.reduce((sum, c) => sum + c.credits, 0);
-  if (credits > profile.creditCap) {
+  if (credits > maxCredits) {
     return {
       plans: [],
-      diagnosis: { causes: [`담은 과목이 ${credits}학점으로 상한 ${profile.creditCap}학점을 넘습니다.`], fixes: [] },
+      diagnosis: { causes: [`담은 과목이 ${credits}학점으로 최대 ${maxCredits}학점을 넘습니다.`], fixes: [] },
     };
   }
-  const limited = { ...conditions, targetCredits: Math.min(conditions.targetCredits, profile.creditCap) };
+  const limited = { ...conditions, maxCredits, minCredits: Math.min(conditions.minCredits, maxCredits) };
   const plans = buildPlans(data, profile, courses, limited);
   if (plans.length > 0) return { plans, diagnosis: null };
   return { plans: [], diagnosis: diagnose(courses, limited) };
@@ -245,6 +270,6 @@ export function planSummary(plan) {
   if (stats.longRuns > 0) cons.push(`3연강 이상 ${stats.longRuns}회`);
   if (stats.rushedMoves > 0) cons.push(`쉬는 시간 내 건물 이동 ${stats.rushedMoves}회`);
   if (stats.nightBlocks > 0) cons.push(`야간 수업 ${stats.nightBlocks}회`);
-  if (stats.credits < 15) cons.push(`${stats.credits}학점으로 다소 적음`);
+  if (stats.longGaps > 0) cons.push(`우주 공강 ${stats.longGaps}회`);
   return { pros, cons };
 }

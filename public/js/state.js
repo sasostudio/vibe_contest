@@ -7,9 +7,10 @@ const initial = () => ({
   profile: null, // { dept, year, nickname, creditCap }
   selectedKeys: null, // 담은 과목 키. null이면 아직 추천을 적용하지 않은 상태
   extraKeys: [], // 검색으로 추가한 과목 키
+  pinned: {}, // 과목 키 → 고정한 분반 번호. 없으면 자동 배정
   conditionText: '',
   conditions: { ...DEFAULT_CONDITIONS },
-  plans: null, // [{ ids: [분반 번호], note }]
+  plans: null, // [{ ids: [분반 번호], sat: 예상 만족도 }]
   diagnosis: null,
   result: null, // 서버가 돌려준 { entry, standing }
 });

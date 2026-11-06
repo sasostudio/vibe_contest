@@ -71,6 +71,10 @@ td.mid, th.mid { text-align: center; white-space: nowrap; }
 tr.mine td { background: var(--note); font-weight: 700; }
 tr.pending td { color: var(--mute); }
 .form th { width: 118px; }
+.sections { min-width: 760px; }
+.sections tr.course-head td { border-top: 2px solid var(--navy); }
+.sections td label.check { margin-right: 0; }
+.plan-note ul { margin: 3px 0 0; padding-left: 16px; }
 .form td { background: #fbfcfe; }
 .tag { display: inline-block; padding: 0 4px; border: 1px solid var(--line); background: #f2f5f9; color: var(--mute); font-size: 12px; }
 
@@ -102,6 +106,7 @@ label.check { display: inline-block; margin-right: 12px; white-space: nowrap; }
 
 /* 편성 결과 */
 .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.plans[hidden] { display: none; } /* display:grid가 hidden 속성을 덮지 않게 한다 */
 .plan .win-title { display: flex; justify-content: space-between; gap: 8px; }
 .plan .win-body { padding: 7px; }
 .plan-note { min-height: 42px; padding: 5px 7px; background: #f4f7fb; border: 1px solid var(--sky); }

@@ -1,7 +1,9 @@
-// 7·9번 화면. 3안 비교, 실패 시 원인과 대안, 대표 등록.
+// 7·9번 화면. 후보 평가와 비교, 실패 시 원인과 대안, 대표 등록.
+// 후보는 코드가 만들고, 어느 안을 위에 둘지는 AI 예상 만족도로 정한다. 총점은 코드 값 그대로다.
 import { DATA } from '../../data/courses.js';
 import { parseAiJson } from '../../lib/conditions.js';
 import { planSummary } from '../../lib/planner.js';
+import { bySatisfaction, planFacts, readAiSatisfaction, simpleSatisfaction } from '../../lib/satisfaction.js';
 import { eligibilityProblems, scoreTimetable } from '../../lib/score.js';
 import { askAi, registerTimetable } from '../api.js';
 import { currentSession, signInAnonymously, signInWithGoogle } from '../auth.js';
@@ -9,55 +11,62 @@ import { closeDialog, esc, hourRange, openDialog, pathLine, showAlert, showBusy,
 import { save, state } from '../state.js';
 import { runPlanner } from './conditions.js';
 
+const FIRST_SHOWN = 3;
 const sectionById = new Map(DATA.courses.map((c) => [c.id, c]));
+const allNames = [...new Set(DATA.courses.map((c) => c.name))];
 
 const loadPlans = () => (state.plans ?? []).map((saved) => {
   const sections = saved.ids.map((id) => sectionById.get(id)).filter(Boolean);
   return { ...saved, sections, score: scoreTimetable(sections) };
 });
 
+// 후보 전체를 AI 1회 호출로 평가한다. 실패하면 간이 계산으로 채운다.
+async function rateCandidates(plans) {
+  const c = state.conditions;
+  const request = {
+    '학생이 쓴 문장': state.conditionText || '(문장 없음, 조건표로 입력)',
+    조건: {
+      공강: c.freeDays.map((d) => '월화수목금'[d]).join(''),
+      '1교시 제외': c.noFirst,
+      '야간 제외': c.noNight,
+      학점: `${c.minCredits}~${c.maxCredits}`,
+      '교양 영역': c.areas.join(', ') || '전체',
+      듣고싶은: c.wantKeywords,
+      피할: c.avoidKeywords,
+      '그 밖의 희망': c.preferences,
+    },
+    후보: plans.map(planFacts),
+  };
+  const answer = await askAi('satisfaction', JSON.stringify(request));
+  const parsed = answer ? parseAiJson(answer) : null;
+  const sats = parsed ? readAiSatisfaction(parsed, plans, c, allNames) : plans.map((p) => simpleSatisfaction(p, c));
+  const rated = plans.map((plan, i) => ({ ...plan, sat: sats[i] })).sort(bySatisfaction);
+  state.plans = rated.map(({ ids, sat }) => ({ ids, sat }));
+  save();
+  return rated;
+}
+
+function checksHtml(sat) {
+  const source = { ai: 'AI 평가', 'ai-corrected': 'AI 평가, 코드 보정' }[sat.source] ?? '간이 계산';
+  const rows = sat.checks.map((c) =>
+    `<li><b>${c.met ? '충족' : '미충족'}</b> ${esc(c.label)}${c.reason ? ` <span class="hint">${esc(c.reason)}</span>` : ''}</li>`).join('');
+  return `<div class="plan-note"><p><b>예상 만족도 ${sat.score}%</b> <span class="tag">${source}</span></p><ul>${rows}</ul></div>`;
+}
+
 function planHtml(plan, index, range) {
-  const { pros, cons } = planSummary(plan);
+  const { cons } = planSummary(plan);
   const problems = eligibilityProblems(plan.sections, state.profile.dept);
-  const fixedNote = pros.length ? `${pros.join(', ')}.` : '조건에 맞춘 기본안입니다.';
   return `<section class="win plan">
-    <h2 class="win-title"><span>제${index + 1}안</span><span>예상 ${plan.score.total}점 ${esc(plan.score.grade)}</span></h2>
+    <h2 class="win-title"><span>제${index + 1}안 · 만족도 ${plan.sat.score}%</span><span>총점 ${plan.score.total}점 ${esc(plan.score.grade)}</span></h2>
     <div class="win-body">
       ${timetableGrid(plan.sections, range)}
-      <p class="plan-note" data-note="${index}">${esc(plan.note ?? fixedNote)}</p>
-      ${pros.length ? `<ul>${pros.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
-      ${cons.length ? `<ul class="cons">${cons.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}
+      ${checksHtml(plan.sat)}
+      ${cons.length ? `<p class="cons">총점 감점: ${cons.map(esc).join(', ')}</p>` : ''}
       <p class="course-list">${plan.score.stats.credits}학점: ${plan.sections.map((s) => esc(s.name)).join(', ')}</p>
       ${problems.length ? `<div class="box-note"><b>등록 자격 미달</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
       <button class="btn btn-go" data-register="${index}"${problems.length ? ' disabled' : ''}>이 안을 대표로 등록</button>
     </div>
   </section>`;
-}
-
-async function fillAiNotes(view, plans) {
-  if (plans.every((p) => p.note)) return;
-  const facts = plans.map((p, i) => ({
-    안: i + 1,
-    학점: p.score.stats.credits,
-    '평일 공강': `${p.score.stats.freeDays}일`,
-    '점심시간 있는 날': `${p.score.stats.lunchDays}일`,
-    '수업 있는 날': `${p.score.stats.classDays}일`,
-    '1교시 있는 날': `${p.score.stats.firstPeriodDays}일`,
-    '3연강 이상': `${p.score.stats.longRuns}회`,
-    '예상 점수': p.score.total,
-    과목: p.sections.map((s) => s.name),
-  }));
-  const answer = await askAi('plan_notes', JSON.stringify(facts));
-  const notes = answer ? parseAiJson(answer)?.notes : null;
-  if (!Array.isArray(notes)) return;
-  plans.forEach((plan, i) => {
-    if (typeof notes[i] !== 'string' || !notes[i].trim() || notes[i].includes('교수')) return;
-    const note = notes[i].trim().slice(0, 120);
-    state.plans[i].note = note;
-    const slot = view.querySelector(`[data-note="${i}"]`);
-    if (slot) slot.textContent = note;
-  });
-  save();
 }
 
 function askLogin() {
@@ -97,7 +106,7 @@ async function register(plan) {
       showAlert('등록 실패', data.problems ?? [data.error ?? '잠시 뒤 다시 시도하십시오.']);
       return;
     }
-    state.result = { ...data, fresh: true };
+    state.result = { ...data, satisfaction: plan.sat, fresh: true };
     save();
     location.hash = '#/result';
   } catch {
@@ -123,7 +132,26 @@ function applyFix(fix) {
   showPlans(document.getElementById('view'));
 }
 
-export function showPlans(view) {
+function paint(view, plans) {
+  const range = hourRange(plans.map((p) => p.sections));
+  const first = plans.slice(0, FIRST_SHOWN);
+  const rest = plans.slice(FIRST_SHOWN);
+  view.innerHTML = `${pathLine('시간표 편성 신청', '편성 결과')}
+    <p class="hint">조건에 맞는 후보 ${plans.length}개를 예상 만족도 순으로 보여 줍니다. 순위표에 들어가는 점수는 모두에게 같은 기준인 총점입니다.</p>
+    <div class="plans">${first.map((p, i) => planHtml(p, i, range)).join('')}</div>
+    ${rest.length ? `<div class="row row-end" style="margin-top:9px"><button class="btn" id="more">다른 안 더 보기 (${rest.length}개)</button></div>
+      <div class="plans" id="more-plans" hidden>${rest.map((p, i) => planHtml(p, i + FIRST_SHOWN, range)).join('')}</div>` : ''}
+    <div class="row row-end" style="margin-top:9px"><a class="btn" href="#/conditions">조건 바꿔 다시 짜기</a></div>`;
+  for (const button of view.querySelectorAll('[data-register]')) {
+    button.addEventListener('click', () => register(plans[Number(button.dataset.register)]));
+  }
+  view.querySelector('#more')?.addEventListener('click', (event) => {
+    view.querySelector('#more-plans').hidden = false;
+    event.target.remove();
+  });
+}
+
+export async function showPlans(view) {
   if (!state.profile || state.plans === null) {
     location.hash = state.profile ? '#/conditions' : '#/profile';
     return;
@@ -135,14 +163,12 @@ export function showPlans(view) {
     }
     return;
   }
-  const plans = loadPlans();
-  const range = hourRange(plans.map((p) => p.sections));
-  view.innerHTML = `${pathLine('시간표 편성 신청', '편성 결과')}
-    <div class="plans">${plans.map((p, i) => planHtml(p, i, range)).join('')}</div>
-    <p class="hint">표시된 점수는 예상치입니다. 등록하면 서버가 다시 계산해 확정합니다.</p>
-    <div class="row row-end"><a class="btn" href="#/conditions">조건 바꿔 다시 짜기</a></div>`;
-  for (const button of view.querySelectorAll('[data-register]')) {
-    button.addEventListener('click', () => register(plans[Number(button.dataset.register)]));
+  let plans = loadPlans();
+  if (plans.some((p) => !p.sat)) {
+    view.innerHTML = pathLine('시간표 편성 신청', '편성 결과');
+    showBusy(`AI가 후보 ${plans.length}개의 예상 만족도를 평가하고 있습니다.`);
+    plans = await rateCandidates(plans);
+    closeDialog();
   }
-  fillAiNotes(view, plans);
+  paint(view, plans);
 }

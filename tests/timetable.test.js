@@ -4,7 +4,7 @@ import { DATA } from '../public/data/courses.js';
 import { findConflict, sectionsConflict, blocksByDay } from '../public/lib/timetable.js';
 import { eligibilityProblems, gradeOf, scoreTimetable } from '../public/lib/score.js';
 import { generatePlans, recommendedCourses, targetAllows } from '../public/lib/planner.js';
-import { DEFAULT_CONDITIONS, parseAiJson, sanitizeConditions } from '../public/lib/conditions.js';
+import { DEFAULT_CONDITIONS, GENERAL_AREAS, parseAiJson, sanitizeConditions } from '../public/lib/conditions.js';
 
 const section = (id, slots, extra = {}) => ({
   id, code: id.slice(0, 7), dept: '컴퓨터공학부', type: '전공핵심', name: id, credits: 3, slots, ...extra,
@@ -100,9 +100,9 @@ test('수강대상: 줄임말을 학과와 대조', () => {
 test('편성: 실제 자료로 3안을 만들고 충돌 없음', () => {
   const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 19 };
   const courses = recommendedCourses(DATA, profile).slice(0, 3);
-  const { plans, diagnosis } = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, targetCredits: 18 });
+  const { plans, diagnosis } = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, minCredits: 15, maxCredits: 18 });
   assert.equal(diagnosis, null);
-  assert.ok(plans.length >= 1 && plans.length <= 3);
+  assert.ok(plans.length >= 1 && plans.length <= 12);
   for (const plan of plans) {
     assert.equal(findConflict(plan.sections), null);
     for (const course of courses) assert.ok(plan.sections.some((s) => s.code === course.code));
@@ -130,13 +130,16 @@ test('편성 실패: 학점 상한 초과 안내', () => {
   const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 3 };
   const courses = recommendedCourses(DATA, profile).slice(0, 3);
   const { diagnosis } = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS);
-  assert.ok(diagnosis.causes[0].includes('상한'));
+  assert.ok(diagnosis.causes[0].includes('최대'));
 });
 
 test('조건: AI가 준 이상한 값을 걸러냄', () => {
-  const clean = sanitizeConditions({ freeDays: [4, 4, 9, '금'], targetCredits: 99, noFirst: 'yes', wantKeywords: ['', 3, '영어'] });
+  const clean = sanitizeConditions({ freeDays: [4, 4, 9, '금'], minCredits: 20, maxCredits: 99, noFirst: 'yes', wantKeywords: ['', 3, '영어'], areas: ['인문', '없는영역'] });
   assert.deepEqual(clean.freeDays, [4]);
-  assert.equal(clean.targetCredits, 24);
+  assert.equal(clean.minCredits, 20);
+  assert.equal(clean.maxCredits, 24);
+  assert.deepEqual(clean.areas, ['인문']);
+  assert.equal(sanitizeConditions({ minCredits: 18, maxCredits: 12 }).maxCredits, 18);
   assert.equal(clean.noFirst, false);
   assert.deepEqual(clean.wantKeywords, ['영어']);
 });
@@ -145,4 +148,68 @@ test('AI JSON: 코드블록과 깨진 응답 처리', () => {
   assert.deepEqual(parseAiJson('```json\n{"a":1}\n```'), { a: 1 });
   assert.equal(parseAiJson('죄송합니다'), null);
   assert.equal(parseAiJson('{깨짐'), null);
+});
+
+test('점수: 수업 사이 2시간 이상 비면 우주 공강 감점', () => {
+  const tight = [section('A000001', [[0, 600, 690, room]]), section('B000001', [[0, 700, 790, room]])];
+  const spaced = [section('A000001', [[0, 600, 690, room]]), section('B000001', [[0, 840, 930, room]])];
+  const gap = (s) => scoreTimetable(s).items.find((i) => i.key === 'gaps').points;
+  assert.equal(gap(tight), 10);
+  assert.equal(gap(spaced), 6);
+  assert.equal(scoreTimetable(spaced).stats.maxGap, 150);
+});
+
+test('편성: 학점 범위를 지킨다', () => {
+  const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 24 };
+  const courses = recommendedCourses(DATA, profile).slice(0, 2);
+  const { plans } = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, minCredits: 15, maxCredits: 17 });
+  for (const plan of plans) assert.ok(plan.score.stats.credits <= 17, `${plan.score.stats.credits}`);
+  assert.ok(plans.some((p) => p.score.stats.credits >= 15));
+});
+
+test('편성: 교양 영역을 지정하면 그 영역 교양만 담는다', () => {
+  const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 24 };
+  const courses = recommendedCourses(DATA, profile).slice(0, 2);
+  const majors = new Set(courses.map((c) => c.code));
+  const { plans } = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, areas: ['인문', '(핵심)인문'] });
+  assert.ok(plans.length > 0);
+  for (const plan of plans) {
+    for (const s of plan.sections.filter((x) => !majors.has(x.code))) assert.ok(['인문', '(핵심)인문'].includes(s.area), s.area);
+  }
+});
+
+test('편성: 전공 조합이 적어도 교양을 바꿔 후보를 여러 개 만든다', () => {
+  const profile = { dept: '정보통신공학과', year: 2, creditCap: 19 };
+  const names = ['임베디드컴퓨팅', '하드웨어프로그래밍', '빅데이터개론', '빅데이터수학'];
+  const courses = recommendedCourses(DATA, profile).filter((c) => names.includes(c.name));
+  assert.equal(courses.length, 4);
+  const { plans } = generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, freeDays: [4], noFirst: true });
+  assert.ok(plans.length >= 3, `${plans.length}개`);
+});
+
+test('조건: 교양 영역 목록이 실제 자료 값과 같다', () => {
+  const inData = new Set(DATA.courses.filter((c) => ['기초교양', '핵심교양', '심화교양'].includes(c.type)).map((c) => `${c.type}/${c.area}`));
+  const listed = new Set(Object.entries(GENERAL_AREAS).flatMap(([type, areas]) => areas.map((a) => `${type}/${a}`)));
+  assert.deepEqual([...listed].sort(), [...inData].sort());
+});
+
+test('만족도: 코드로 판정되는 희망은 AI 오판을 바로잡는다', async () => {
+  const { readAiSatisfaction } = await import('../public/lib/satisfaction.js');
+  const sections = [section('A000001', [[0, 540, 615, room]]), section('B000001', [[1, 660, 735, room]])];
+  const plan = { sections, score: scoreTimetable(sections) };
+  const parsed = { plans: [{ id: 1, score: 95, checks: [['아침 수업 없음', 1, '모두 10시 시작'], ['금공강', 1, '금요일 없음']] }] };
+  const [sat] = readAiSatisfaction(parsed, [plan], DEFAULT_CONDITIONS, ['다른과목이름']);
+  assert.equal(sat.checks[0].met, false);
+  assert.equal(sat.checks[1].met, true);
+  assert.equal(sat.source, 'ai-corrected');
+  assert.equal(sat.score, 73);
+});
+
+test('만족도: 후보에 없는 과목을 근거로 쓰면 간이 계산으로 대체', async () => {
+  const { readAiSatisfaction } = await import('../public/lib/satisfaction.js');
+  const sections = [section('A000001', [[0, 600, 690, room]])];
+  const plan = { sections, score: scoreTimetable(sections) };
+  const parsed = { plans: [{ id: 1, score: 90, checks: [['교양', 1, '빅데이터개론 포함']] }] };
+  const [sat] = readAiSatisfaction(parsed, [plan], DEFAULT_CONDITIONS, ['빅데이터개론']);
+  assert.equal(sat.source, 'simple');
 });

@@ -16,4 +16,6 @@
 | 서비스 | Firebase Authentication, Cloud Firestore REST API | 로그인, 대표 시간표 저장 | https://firebase.google.com/docs/firestore/use-rest-api |
 | 시험 도구 | playwright-core (로컬 기존 설치본) | 헤드리스 화면 시험과 스크린샷. 배포물에는 포함하지 않음 | https://playwright.dev |
 
+| 화면 참고 | 「인천대 수강신청 시뮬레이션」 YouTube 영상 0:55 이후 장바구니 화면 (관리자 제공) | 분반별 시간·강의실 행과 담은 과목 목록이라는 구조만 참고. 화면 디자인과 학교 로고는 쓰지 않음 | https://www.youtube.com/watch?v=0koYFq3D1gQ |
+
 외부 코드 복사: 없음. 시간표 계산, 점수, 랭킹 코드는 이번 대회 중 새로 작성.

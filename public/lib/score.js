@@ -12,6 +12,7 @@ const LUNCH_TO = 14 * 60;
 const LUNCH_MIN = 50;
 const BACK_TO_BACK_GAP = 15;
 const LONG_RUN_MIN = 240;
+const LONG_GAP_MIN = 120; // 수업 사이 2시간 이상 비면 우주 공강
 
 const MAJOR_TYPES = new Set(['전공기초', '전공핵심', '전공심화']);
 
@@ -64,6 +65,8 @@ function measure(sections) {
     rushedMoves: 0,
     sameBuildingPairs: 0,
     movePairs: 0,
+    longGaps: 0,
+    maxGap: 0,
   };
   const online = sections.filter((s) => s.slots.length === 0).reduce((sum, s) => sum + s.credits, 0);
   stats.effectiveCredits = stats.credits - online + Math.min(online, ONLINE_CREDIT_LIMIT);
@@ -76,6 +79,9 @@ function measure(sections) {
       if (run.length >= 3 || run.at(-1).end - run[0].start >= LONG_RUN_MIN) stats.longRuns += 1;
     }
     for (let i = 1; i < blocks.length; i++) {
+      const gap = blocks[i].start - blocks[i - 1].end;
+      stats.maxGap = Math.max(stats.maxGap, gap);
+      if (gap >= LONG_GAP_MIN) stats.longGaps += 1;
       const same = buildingOf(blocks[i - 1].room) === buildingOf(blocks[i].room);
       stats.movePairs += 1;
       if (same) stats.sameBuildingPairs += 1;
@@ -89,8 +95,9 @@ const clamp = (value, max) => Math.max(0, Math.min(max, value));
 
 export function scoreTimetable(sections) {
   const s = measure(sections);
-  const freePoints = [0, 15, 25][Math.min(s.freeDays, 2)];
-  const lunchPoints = s.classDays ? Math.round((s.lunchDays / s.classDays) * 20) : 0;
+  const freePoints = [0, 12, 20][Math.min(s.freeDays, 2)];
+  const lunchPoints = s.classDays ? Math.round((s.lunchDays / s.classDays) * 15) : 0;
+  const gapPoints = clamp(10 - 4 * s.longGaps, 10);
   const creditPoints = s.effectiveCredits < MIN_CREDITS ? 0 : clamp((s.effectiveCredits - MIN_CREDITS) * 2 + 8, 20);
   const hoursPoints = clamp(15 - 4 * s.firstPeriodDays - 5 * s.nightBlocks, 15);
   const runPoints = clamp(10 - 3 * s.longRuns, 10);
@@ -98,8 +105,9 @@ export function scoreTimetable(sections) {
   const movePoints = clamp(Math.round(sameRatio * 10) - 2 * s.rushedMoves, 10);
 
   const items = [
-    { key: 'free', label: '공강일', points: freePoints, max: 25, detail: `평일 공강 ${s.freeDays}일` },
-    { key: 'lunch', label: '점심시간', points: lunchPoints, max: 20, detail: `수업일 ${s.classDays}일 중 ${s.lunchDays}일 확보` },
+    { key: 'free', label: '공강일', points: freePoints, max: 20, detail: `평일 공강 ${s.freeDays}일` },
+    { key: 'lunch', label: '점심시간', points: lunchPoints, max: 15, detail: `수업일 ${s.classDays}일 중 ${s.lunchDays}일 확보` },
+    { key: 'gaps', label: '우주 공강', points: gapPoints, max: 10, detail: `수업 사이 2시간 이상 빈 시간 ${s.longGaps}회` },
     { key: 'credits', label: '학점 충실도', points: creditPoints, max: 20, detail: `인정 ${s.effectiveCredits}학점` },
     { key: 'hours', label: '1교시·야간', points: hoursPoints, max: 15, detail: `1교시 ${s.firstPeriodDays}일, 야간 ${s.nightBlocks}회` },
     { key: 'runs', label: '연강', points: runPoints, max: 10, detail: `3연강 이상 ${s.longRuns}회` },

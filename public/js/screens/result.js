@@ -47,7 +47,11 @@ export function showResult(view) {
     location.hash = '#/me';
     return;
   }
-  const { entry, standing, fresh } = state.result;
+  const { entry, standing, fresh, satisfaction } = state.result;
+  // 만족도는 등록한 브라우저에만 있는 참고값이다. 서버 총점과 섞지 않는다.
+  const satLine = satisfaction
+    ? `<p class="hint">예상 만족도 ${satisfaction.score}% (${satisfaction.source === 'simple' ? '간이 계산' : 'AI 평가'}, 순위에는 반영하지 않음)</p>`
+    : '';
   const date = new Date(entry.updatedAt);
   const dateText = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
 
@@ -60,6 +64,7 @@ export function showResult(view) {
         <tr><th scope="row">학년</th><td>${entry.year}학년</td><th scope="row">학점</th><td>${entry.credits}학점</td></tr>
       </tbody></table>
       <p class="paper-total"><span>총점</span><b>${entry.score}</b><span>/ 100</span></p>
+      ${satLine}
       ${scoreTable(entry.items)}
       <p class="paper-title">칭호: ${esc(entry.title)}</p>
       <p class="paper-review">${esc(entry.review)}</p>

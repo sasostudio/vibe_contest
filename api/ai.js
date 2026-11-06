@@ -1,7 +1,7 @@
 import { PROMPTS } from '../prompts/index.js';
 
 const MAX_MESSAGES = 30;
-const MAX_TOTAL_CHARS = 8000;
+const MAX_TOTAL_CHARS = 12000; // 만족도 평가는 후보 12개의 사실을 한 번에 보낸다
 const PROVIDER_TIMEOUT_MS = 20000;
 const MAX_OUTPUT_TOKENS = 2048;
 // 11-06 실측: 1~2초 응답 · 무료 일일 500회. 3.8 Flash는 일일 20회에 60초를 넘겨 제외
@@ -46,7 +46,8 @@ async function postJson(url, headers, body) {
   return res.json();
 }
 
-async function callGemini(model, { system, json }, messages) {
+async function callGemini(model, prompt, messages) {
+  const { system, json } = prompt;
   const data = await postJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     { 'x-goog-api-key': process.env.GEMINI_API_KEY },
@@ -57,7 +58,7 @@ async function callGemini(model, { system, json }, messages) {
         parts: [{ text: m.text }],
       })),
       generationConfig: {
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        maxOutputTokens: prompt.maxTokens ?? MAX_OUTPUT_TOKENS,
         ...(json ? { responseMimeType: 'application/json' } : {}),
       },
     },
@@ -65,13 +66,14 @@ async function callGemini(model, { system, json }, messages) {
   return (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
 }
 
-async function callGroq({ system, json }, messages) {
+async function callGroq(prompt, messages) {
+  const { system, json } = prompt;
   const data = await postJson(
     'https://api.groq.com/openai/v1/chat/completions',
     { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     {
       model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: prompt.maxTokens ?? MAX_OUTPUT_TOKENS,
       messages: [
         { role: 'system', content: system },
         ...messages.map((m) => ({ role: m.role, content: m.text })),

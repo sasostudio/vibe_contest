@@ -42,11 +42,17 @@ const page = await freshPage();
 await page.goto(base);
 await page.waitForSelector('#league-area table, #league-area .box-note');
 check('홈이 로그인 없이 열림', true);
+check('가상 데이터 표시', (await page.textContent('#league-area')).includes('시연용 가상 데이터'));
 await shot(page, '01-home');
 
 await fillProfile(page, '시험학생');
 const checked = await page.locator('#course-area input[type=checkbox]:checked').count();
 check('추천 과목이 기본 체크됨', checked > 0, `${checked}개`);
+const sectionText = await page.textContent('table.sections');
+check('분반별 시간과 강의실 표시', /\d\d:\d\d~\d\d:\d\d \(/.test(sectionText));
+await page.locator('[data-pin-key]').nth(1).check();
+check('분반 고정이 담은 과목에 표시', (await page.textContent('#cart')).includes('분반 고정'));
+await page.locator('[data-pin-key][value=""]').first().check();
 await shot(page, '02-courses');
 
 await page.click('#next');
@@ -58,8 +64,8 @@ const aiStatus = await page.textContent('#ai-status');
 check('AI 조건 변환 성공', aiStatus.includes('정리했습니다'), aiStatus);
 check('금요일 공강 반영', await page.isChecked('[data-day="4"]'));
 check('1교시 제외 반영', await page.isChecked('#no-first'));
-check('목표 학점 15 반영', (await page.inputValue('#target')) === '15');
-check('처리 불가 요청 분리', (await page.textContent('#unsupported')).length > 0, (await page.textContent('#unsupported')).slice(0, 60));
+check('학점 15 반영', (await page.inputValue('#min-credits')) === '15' && (await page.inputValue('#max-credits')) === '15');
+check('처리 불가 요청 분리', (await page.textContent('#extra')).includes('해결할 수 없는'), (await page.textContent('#extra')).slice(0, 80));
 await shot(page, '03-conditions');
 
 await page.click('#run');
@@ -71,7 +77,12 @@ await page.waitForSelector('.plan', { timeout: 15000 });
 check('대안 버튼으로 바로 재편성', true);
 const planCount = await page.locator('.plan').count();
 check('시간표 안 생성', planCount >= 1, `${planCount}안`);
-await page.waitForTimeout(3500);
+const firstNote = await page.textContent('.plan-note');
+check('예상 만족도 AI 평가', firstNote.includes('AI 평가'), firstNote.replace(/\s+/g, ' ').slice(0, 90));
+check('총점 별도 표시', (await page.textContent('.plan .win-title')).includes('총점'));
+const visible = await page.locator('.plan:visible').count();
+check('처음엔 3안만 표시', visible === Math.min(3, planCount), `${visible}개`);
+if (planCount > 3) { await page.click('#more'); check('더 보기로 전체 표시', (await page.locator('.plan:visible').count()) === planCount); }
 await shot(page, '04-plans');
 
 await page.click('[data-register="0"]');
@@ -111,8 +122,8 @@ await offline.check('[data-day="4"]');
 await offline.click('#run');
 await offline.waitForSelector('.plan', { timeout: 15000 });
 await offline.waitForTimeout(600);
-const fixedNote = await offline.textContent('[data-note="0"]');
-check('AI 실패에도 고정 문구로 3안 표시', fixedNote.length > 0, fixedNote);
+const fixedNote = await offline.textContent('.plan-note');
+check('AI 실패에도 간이 계산 만족도로 표시', fixedNote.includes('간이 계산'), fixedNote.replace(/\s+/g, ' ').slice(0, 80));
 
 // 3. 편성 실패 진단
 const stuck = await freshPage();
