@@ -79,6 +79,7 @@ tr.pending td { color: var(--mute); }
 .tab[aria-selected='true'] { background: var(--navy); color: #fff; }
 .tab-body { margin-top: 0; }
 .tab-body .row + .row { margin-top: 4px; }
+tr.not-mine td { background: #f0f0f0; color: #8a8a8a; }
 .class.guess { border: 1px dashed #33475d; opacity: 0.85; }
 .class.ghost { opacity: 0.75; border: 2px dashed var(--navy); }
 .class.clash { border: 2px solid #d00; }

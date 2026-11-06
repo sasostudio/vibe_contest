@@ -45,22 +45,27 @@ function chooseCell(course, isGeneral) {
 
 function courseRows(course) {
   const isGeneral = GENERAL_TYPES.includes(course.type);
-  const needsCheck = course.sections.some((s) => !targetAllows(s, state.profile.dept));
+  const mine = course.sections.filter((s) => targetAllows(s, state.profile.dept)).length;
+  const tag = mine === 0 ? '내 학과 대상 분반 없음' : mine < course.sections.length ? '학과별 분반' : '';
   const span = course.sections.length + 1;
   const head = `<tr class="course-head">
     <td class="${isGeneral ? '' : 'mid'}" rowspan="${span}">${chooseCell(course, isGeneral)}</td>
-    <td rowspan="${span}"><b>${esc(course.name)}</b>${needsCheck ? ' <span class="tag">수강대상 확인</span>' : ''}<br><span class="hint">${esc(isGeneral ? course.area : course.dept)} · ${esc(course.grade)}${course.grade === '전학년' ? '' : '학년'}</span></td>
+    <td rowspan="${span}"><b>${esc(course.name)}</b>${tag ? ` <span class="tag">${tag}</span>` : ''}<br><span class="hint">${esc(isGeneral ? course.area : course.dept)} · ${esc(course.grade)}${course.grade === '전학년' ? '' : '학년'}</span></td>
     <td rowspan="${span}">${esc(course.type)}</td>
     <td class="num" rowspan="${span}">${course.credits}</td>
     <td colspan="3" class="hint">분반 ${course.sections.length}개</td>
     <td>${pinCell(course, '', '자동 배정')}</td>
   </tr>`;
-  const rows = course.sections.map((s) => `<tr data-section="${esc(s.id)}">
+  const rows = course.sections.map((s) => {
+    const allowed = targetAllows(s, state.profile.dept);
+    const target = s.target ? `<br><span class="hint">대상: ${esc(s.target)}</span>` : '';
+    return `<tr data-section="${esc(s.id)}"${allowed ? '' : ' class="not-mine"'}>
     <td class="mid">${sectionNo(s)}</td>
-    <td>${esc(sectionTime(s))}</td>
+    <td>${esc(sectionTime(s))}${target}</td>
     <td class="num">${s.cap ? `${s.cap}명` : '-'}</td>
-    <td>${pinCell(course, s.id, '이 분반 고정')}</td>
-  </tr>`).join('');
+    <td>${allowed ? pinCell(course, s.id, '이 분반 고정') : '다른 학과 대상'}</td>
+  </tr>`;
+  }).join('');
   return head + rows;
 }
 
@@ -112,7 +117,7 @@ function arrangement() {
     return only.length ? { ...c, sections: only } : c;
   });
   const fixedIds = new Set(courses.filter((c) => c.sections.length === 1).map((c) => c.sections[0].id));
-  const best = bestArrangement(courses);
+  const best = bestArrangement(courses, state.profile.dept);
   const value = best
     ? { placed: best, guessIds: new Set(best.filter((s) => !fixedIds.has(s.id)).map((s) => s.id)), causes: [] }
     : { placed: courses.filter((c) => c.sections.length === 1).map((c) => c.sections[0]), guessIds: new Set(), causes: diagnose(courses, NO_CONDITIONS).causes };

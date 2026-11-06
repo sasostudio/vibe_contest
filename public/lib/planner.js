@@ -16,12 +16,33 @@ const GENERAL_TYPES = new Set(['핵심교양', '심화교양', '기초교양']);
 // 공지의 수강대상 줄임말 → 학과 이름에 들어 있는 글자
 const TARGET_ALIAS = {
   정통: '정보통신', 국문: '국어국문', 영문: '영어영문', 일문: '일본', 독문: '독어독문', 불문: '불어불문',
-  중국: '중어중국', 산경: '산업경영', 신방: '미디어', 정외: '정치외교',
+  중국: '중어중국', 산경: '산업경영', 신방: '미디어', 정외: '정치외교', '기계ㆍ로봇공학': '기계',
+  무역: 'Global Trade', // 이번 학기 주간 무역학부는 Global Trade & Service학부로 개설
 };
+// 학과 칸이 이 값인 교양은 누구나 듣는다. 그 밖의 학과가 개설한 교양은 그 학과 학생용이다.
+const OPEN_DEPTS = new Set(['교양', '교직', '일선', '군사학', 'HUSS(타대학)']);
 
-export function targetAllows(course, dept) {
-  if (!course.target) return true;
-  return course.target.split(',').some((token) => dept.includes(TARGET_ALIAS[token] ?? token));
+function tokenMatches(raw, dept) {
+  const token = raw.trim();
+  const night = token.endsWith('(야)');
+  if (night !== dept.includes('(야)')) return false; // 주간 대상과 야간 대상을 섞지 않는다
+  const base = token.replace(/\(야\)$/, '').replace(/\(.*\)$/, ''); // 자유전공학부(인문) → 자유전공학부
+  if (/통상$/.test(base)) return dept.includes('동북아국제통상'); // 동북아·한국·중국 등 통상 트랙
+  return dept.includes(base) || dept.includes(TARGET_ALIAS[base] ?? base);
+}
+
+// 이 학과 학생이 이 분반을 들을 수 있는가. 자동 채우기, 희망 과목, 미리보기, 화면 표시가 모두 이 함수를 쓴다.
+// 11-06 실측: 학과 개설 기초교양 81분반을 아무 학과에나 채워 자동 편성의 48%에 남의 학과 분반이 들어갔다.
+export function targetAllows(section, dept) {
+  if (section.target) return section.target.split(',').some((token) => tokenMatches(token, dept));
+  if (GENERAL_TYPES.has(section.type) && section.dept && !OPEN_DEPTS.has(section.dept)) return section.dept === dept;
+  return true;
+}
+
+// 고른 과목에서 내 학과가 들을 수 있는 분반만 남긴다. 하나도 없으면 그대로 둔다(화면이 「내 학과 대상 분반 없음」을 알린다).
+export function sectionsForDept(course, dept) {
+  const allowed = course.sections.filter((s) => targetAllows(s, dept));
+  return allowed.length && allowed.length < course.sections.length ? { ...course, sections: allowed } : course;
 }
 
 const gradeMatches = (course, year) => course.grade === '전학년' || course.grade === String(year);
@@ -63,8 +84,8 @@ export function defaultSelection(courses, conditions, credits = 12) {
 // 과목 화면의 실시간 미리보기용: 담은 과목만으로 겹치지 않는 분반 조합 중 총점이 가장 높은 것. 없으면 null.
 // 조건(공강 요일 등)은 다음 단계에서 적용하므로 여기서는 겹침만 본다.
 const OPEN_CONDITIONS = { freeDays: [], noFirst: false, noNight: false };
-export function bestArrangement(courses) {
-  const bases = searchCombinations(courses, OPEN_CONDITIONS);
+export function bestArrangement(courses, dept) {
+  const bases = searchCombinations(courses.map((c) => sectionsForDept(c, dept)), OPEN_CONDITIONS);
   if (bases.length === 0) return null;
   let best = bases[0];
   let bestTotal = -1;
@@ -278,6 +299,7 @@ export function generatePlans(data, profile, courses, conditions, { excludeCodes
     };
   }
   const limited = { ...conditions, maxCredits, minCredits: Math.min(conditions.minCredits, maxCredits) };
+  courses = courses.map((c) => sectionsForDept(c, profile.dept));
   const plans = buildPlans(data, profile, courses, limited, new Set(excludeCodes));
   if (plans.length > 0) return { plans, diagnosis: null };
   return { plans: [], diagnosis: diagnose(courses, limited) };

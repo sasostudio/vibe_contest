@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DATA } from '../public/data/courses.js';
 import { findConflict, sectionsConflict, blocksByDay } from '../public/lib/timetable.js';
 import { eligibilityProblems, gradeOf, scoreTimetable } from '../public/lib/score.js';
-import { generatePlans, recommendedCourses, targetAllows } from '../public/lib/planner.js';
+import { generatePlans, groupCourses, recommendedCourses, targetAllows } from '../public/lib/planner.js';
 import { DEFAULT_CONDITIONS, GENERAL_AREAS, parseAiJson, sanitizeConditions } from '../public/lib/conditions.js';
 
 const section = (id, slots, extra = {}) => ({
@@ -95,6 +95,47 @@ test('수강대상: 줄임말을 학과와 대조', () => {
   assert.ok(targetAllows({ target: '컴퓨터,정통,임베디드' }, '정보통신공학과'));
   assert.ok(!targetAllows({ target: '독문,불문,중국' }, '컴퓨터공학부'));
   assert.ok(targetAllows({}, '컴퓨터공학부'));
+  assert.ok(targetAllows({ target: '동북아통상,한국통상' }, '동북아국제통상전공'));
+  assert.ok(targetAllows({ target: '경제(야)' }, '경제학과(야)'));
+  assert.ok(!targetAllows({ target: '경제(야)' }, '경제학과'));
+  assert.ok(targetAllows({ target: '자유전공학부(인문)' }, '자유전공학부'));
+  assert.ok(targetAllows({ target: '무역' }, 'Global Trade & Service학부'));
+  assert.ok(targetAllows({ target: '무역(야)' }, '무역학부(야)'));
+});
+
+test('수강대상: 학과가 개설한 기초교양은 그 학과 학생만', () => {
+  const physics = DATA.courses.find((c) => c.type === '기초교양' && c.dept === '기계공학과');
+  assert.ok(physics);
+  assert.ok(targetAllows(physics, '기계공학과'));
+  assert.ok(!targetAllows(physics, '컴퓨터공학부'));
+  const open = DATA.courses.find((c) => c.type === '기초교양' && c.dept === '교양' && !c.target);
+  assert.ok(targetAllows(open, '컴퓨터공학부'));
+});
+
+test('편성: 자동으로 채운 교양에 다른 학과 대상 분반이 없다', () => {
+  let checked = 0;
+  for (const dept of DATA.depts.slice(0, 40)) {
+    const profile = { dept, year: 2, creditCap: 21 };
+    const courses = recommendedCourses(DATA, profile).slice(0, 2);
+    if (!courses.length) continue;
+    for (const plan of generatePlans(DATA, profile, courses, { ...DEFAULT_CONDITIONS, minCredits: 18, maxCredits: 21 }).plans.slice(0, 3)) {
+      for (const s of plan.sections) assert.ok(targetAllows(s, dept), `${dept} ← ${s.dept} ${s.name}`);
+      checked += 1;
+    }
+  }
+  assert.ok(checked > 20);
+});
+
+test('편성: 희망한 교양도 내 학과 대상 분반만 배정', () => {
+  const profile = { dept: '국어국문학과', year: 1, creditCap: 21 };
+  const academic = groupCourses(DATA.courses.filter((c) => c.name === 'Academic English' && c.dept === '교양'));
+  assert.equal(academic.length, 1);
+  const { plans } = generatePlans(DATA, profile, academic, { ...DEFAULT_CONDITIONS, minCredits: 12, maxCredits: 21 });
+  assert.ok(plans.length > 0);
+  for (const plan of plans) {
+    const picked = plan.sections.find((s) => s.name === 'Academic English');
+    assert.ok(picked.target.includes('국문'), picked.target);
+  }
 });
 
 test('편성: 실제 자료로 3안을 만들고 충돌 없음', () => {
@@ -239,9 +280,9 @@ test('예상 배정: 담은 과목을 겹치지 않게 배치하고, 어떻게 �
   const course = (code, sectionsSlots) => ({ key: code, code, name: code, credits: 3, sections: sectionsSlots.map((slots, i) => section(`${code}00${i}`, slots)) });
   const a = course('A00000', [[[0, 600, 690, room]], [[1, 600, 690, room]]]);
   const b = course('B00000', [[[0, 600, 690, room]]]);
-  const picked = bestArrangement([a, b]);
+  const picked = bestArrangement([a, b], '컴퓨터공학부');
   assert.equal(picked.length, 2);
   assert.equal(findConflict(picked), null);
   const c = course('C00000', [[[0, 600, 690, room]]]);
-  assert.equal(bestArrangement([b, c]), null);
+  assert.equal(bestArrangement([b, c], '컴퓨터공학부'), null);
 });
