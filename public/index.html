@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>준비 중</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f6f5f1; color: #222; }
+    main { padding: 16px; text-align: center; }
+    button { padding: 10px 16px; font-size: 16px; cursor: pointer; }
+    #result { min-height: 24px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>준비 중</h1>
+    <button id="check">AI 연결 확인</button>
+    <p id="result"></p>
+  </main>
+  <script>
+    const result = document.getElementById('result');
+    document.getElementById('check').addEventListener('click', async () => {
+      result.textContent = '확인 중';
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task: 'ping', messages: [{ role: 'user', text: '연결 확인' }] }),
+        });
+        const data = await res.json();
+        result.textContent = res.ok ? `${data.provider}: ${data.text}` : data.error;
+      } catch {
+        result.textContent = '서버 연결 실패';
+      }
+    });
+  </script>
+</body>
+</html>
