@@ -28,6 +28,13 @@ function load() {
 
 export const state = load();
 
+// 작성 기록 초기화: 학적, 고른 과목, 조건, 편성 결과를 처음 상태로 돌린다
+export function resetState() {
+  for (const key of Object.keys(state)) delete state[key];
+  Object.assign(state, initial());
+  save();
+}
+
 export function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));

@@ -18,4 +18,6 @@
 
 | 화면 참고 | 「인천대 수강신청 시뮬레이션」 YouTube 영상 0:55 이후 장바구니 화면 (관리자 제공) | 분반별 시간·강의실 행과 담은 과목 목록이라는 구조만 참고. 화면 디자인과 학교 로고는 쓰지 않음 | https://www.youtube.com/watch?v=0koYFq3D1gQ |
 
+| 라이브러리 | qrcodejs 1.0.0 (MIT, cdnjs) | 참여 QR 화면에서만 불러와 QR 그림 생성 | https://github.com/davidshimjs/qrcodejs |
+
 외부 코드 복사: 없음. 시간표 계산, 점수, 랭킹 코드는 이번 대회 중 새로 작성.

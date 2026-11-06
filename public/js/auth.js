@@ -49,7 +49,9 @@ export async function signInWithGoogle() {
     import(`${SDK}/firebase-app.js`),
     import(`${SDK}/firebase-auth.js`),
   ]);
-  const { user } = await auth.signInWithPopup(auth.getAuth(initializeApp(firebaseConfig)), new auth.GoogleAuthProvider());
+  const { getApps } = await import(`${SDK}/firebase-app.js`);
+  const app = getApps()[0] ?? initializeApp(firebaseConfig); // 로그아웃 뒤 다시 로그인해도 앱을 두 번 만들지 않는다
+  const { user } = await auth.signInWithPopup(auth.getAuth(app), new auth.GoogleAuthProvider());
   const result = await user.getIdTokenResult();
   return keep({
     uid: user.uid,
@@ -58,6 +60,24 @@ export async function signInWithGoogle() {
     refreshToken: user.refreshToken,
     expiresAt: new Date(result.expirationTime).getTime(),
   });
+}
+
+// 로그아웃. 익명 계정은 이 뒤로 다시 들어갈 방법이 없으므로 화면에서 먼저 확인을 받는다.
+export async function signOut() {
+  const wasGoogle = session?.provider === 'google';
+  session = null;
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // 저장소가 막힌 브라우저는 메모리 세션만 지우면 된다
+  }
+  if (!wasGoogle) return;
+  // 구글 로그인은 SDK도 자기 저장소에 세션을 남기므로 함께 끊는다
+  const [{ getApps, initializeApp }, auth] = await Promise.all([
+    import(`${SDK}/firebase-app.js`),
+    import(`${SDK}/firebase-auth.js`),
+  ]);
+  await auth.signOut(auth.getAuth(getApps()[0] ?? initializeApp(firebaseConfig)));
 }
 
 export async function idToken() {

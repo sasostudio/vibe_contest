@@ -83,6 +83,11 @@ tr.pending td { color: var(--mute); }
 .class.clash { border: 2px solid #d00; }
 .clash-note { color: #b00; font-weight: 700; }
 .chip { margin: 2px 4px 2px 0; font-weight: 400; }
+.top-btn { min-height: 22px; margin-left: 6px; padding: 1px 8px; font-size: 12px; }
+.join { text-align: center; }
+.join-qr { display: inline-block; padding: 16px; background: #fff; border: 1px solid var(--line); }
+.join-qr img, .join-qr canvas { display: block; width: min(70vw, 420px); height: auto; }
+.join-url { margin-top: 10px; font: 700 22px var(--body); word-break: break-all; }
 .chip[aria-pressed='true'] { border-style: inset; background: var(--blue); color: #fff; font-weight: 700; }
 .sections tr.course-head td { border-top: 2px solid var(--navy); }
 .sections td label.check { margin-right: 0; }

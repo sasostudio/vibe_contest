@@ -202,6 +202,35 @@ check('일반 사용자 직접 읽기 차단', (await direct('league/summary', s
 check('일반 사용자 점수 직접 쓰기 차단', (await direct(`entries/${session.uid}`, session.idToken, { method: 'PATCH', body })).status === 403);
 check('비로그인 점수 직접 쓰기 차단', (await direct('entries/forged', null, { method: 'PATCH', body })).status === 403);
 
+// 7. 참여 QR, 등록 취소, 로그아웃, 초기화
+const qrPage = await freshPage();
+await qrPage.goto(`${base}/#/join`);
+await qrPage.waitForSelector('#qr img[src^="data:"], #qr canvas', { state: 'attached', timeout: 15000 });
+await qrPage.waitForTimeout(500);
+check('참여 QR 표시', true);
+await shot(qrPage, '11-join');
+
+await page.goto(`${base}/#/me`);
+await page.waitForSelector('[data-account=withdraw]');
+await page.click('[data-account=withdraw]');
+await page.click('[data-yes]');
+await page.waitForFunction(() => location.hash === '#/' || location.hash === '');
+const meAfter = await (await fetch(`${base}/api/me`, { headers: { Authorization: `Bearer ${session.idToken}` } })).json();
+check('대표 등록 취소 후 기록 없음', meAfter.entry === null && meAfter.standing === null);
+await page.goto(`${base}/#/me`);
+await page.waitForSelector('.top-btn[data-account=logout]');
+await page.click('.top-btn[data-account=logout]');
+check('익명 로그아웃 경고 표시', (await page.textContent('.modal')).includes('다시 볼 수 없습니다'));
+await page.click('[data-yes]');
+await page.waitForFunction(() => !localStorage.getItem('timetable-league-session'));
+check('로그아웃 후 세션 삭제', true);
+await page.goto(`${base}/#/me`);
+await page.waitForSelector('[data-account=reset]');
+await page.click('[data-account=reset]');
+await page.click('[data-yes]');
+await page.waitForFunction(() => JSON.parse(localStorage.getItem('timetable-league-v1')).profile === null);
+check('작성 기록 초기화', true);
+
 await browser.close();
 const failed = results.filter((ok) => !ok).length;
 console.log(`\n${results.length - failed}/${results.length} 통과`);

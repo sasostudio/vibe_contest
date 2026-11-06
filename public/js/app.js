@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import { currentSession } from './auth.js';
 import { closeDialog, esc } from './ui.js';
+import { bindAccountButtons } from './account.js';
 import { showHome } from './screens/home.js';
 import { showProfile } from './screens/profile.js';
 import { showCourses } from './screens/courses.js';
@@ -10,6 +11,7 @@ import { showPlans } from './screens/plans.js';
 import { showResult } from './screens/result.js';
 import { showMe } from './screens/me.js';
 import { showLeague } from './screens/league.js';
+import { showJoin } from './screens/join.js';
 
 const ROUTES = {
   '': showHome,
@@ -20,6 +22,7 @@ const ROUTES = {
   result: showResult,
   me: showMe,
   league: showLeague,
+  join: showJoin,
 };
 
 const STEPS = [
@@ -45,7 +48,8 @@ function paintChrome(route) {
   }
   const { profile } = state;
   const who = profile ? `${esc(profile.dept)} ${esc(profile.nickname)} 님` : '비로그인 열람';
-  document.getElementById('top-user').innerHTML = `${who}${currentSession() ? ' 접속 중' : ''}`;
+  const logout = currentSession() ? ' <button class="btn top-btn" data-account="logout">로그아웃</button>' : '';
+  document.getElementById('top-user').innerHTML = `${who}${currentSession() ? ' 접속 중' : ''}${logout}`;
 }
 
 async function route() {
@@ -60,5 +64,6 @@ async function route() {
   paintChrome(name);
 }
 
+bindAccountButtons(document.body);
 window.addEventListener('hashchange', route);
 route();

@@ -37,6 +37,12 @@ export async function fetchMe() {
   return res.json();
 }
 
+export async function withdrawTimetable() {
+  const res = await fetch('/api/withdraw', { method: 'POST', headers: await authHeaders() });
+  if (!res.ok) throw new Error('등록 취소 실패');
+  return res.json();
+}
+
 // 반환: { ok, status, data }. 자격 미달 사유를 화면에 보여 줘야 해서 예외로 바꾸지 않는다.
 export async function registerTimetable(payload) {
   const res = await fetch('/api/register', {
