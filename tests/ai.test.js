@@ -31,7 +31,13 @@ test('Gemini 성공 시 Gemini 답 반환', async () => {
   globalThis.fetch = async () => reply(200, geminiOk);
   const { status, data } = await run();
   assert.equal(status, 200);
-  assert.deepEqual(data, { text: '제미나이 답', provider: 'gemini' });
+  assert.deepEqual(data, { text: '제미나이 답', provider: 'gemini-3.5-flash-lite' });
+});
+
+test('첫 Gemini 모델 실패 시 다음 Gemini 모델로 전환', async () => {
+  globalThis.fetch = async (url) => (url.includes('3.5-flash-lite') ? reply(429) : reply(200, geminiOk));
+  const { data } = await run();
+  assert.equal(data.provider, 'gemini-3.1-flash-lite');
 });
 
 test('Gemini 실패 시 Groq로 전환', async () => {
@@ -117,5 +123,5 @@ test('두 제공자 모두 출력 토큰 상한 전달', async () => {
   globalThis.fetch = async (url, init) => { sent.push(JSON.parse(init.body)); return reply(500); };
   await run();
   assert.equal(sent[0].generationConfig.maxOutputTokens, 2048);
-  assert.equal(sent[1].max_tokens, 2048);
+  assert.equal(sent[2].max_tokens, 2048);
 });

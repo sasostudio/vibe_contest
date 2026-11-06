@@ -4,6 +4,8 @@ const MAX_MESSAGES = 30;
 const MAX_TOTAL_CHARS = 8000;
 const PROVIDER_TIMEOUT_MS = 20000;
 const MAX_OUTPUT_TOKENS = 2048;
+// 11-06 실측: 1~2초 응답 · 무료 일일 500회. 3.8 Flash는 일일 20회에 60초를 넘겨 제외
+const DEFAULT_GEMINI_MODELS = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite';
 const RATE_LIMIT_PER_MINUTE = 60; // 대회장 참가자가 같은 공인 IP를 쓸 수 있어 넉넉하게 둔다
 
 const hits = new Map();
@@ -44,8 +46,7 @@ async function postJson(url, headers, body) {
   return res.json();
 }
 
-async function callGemini({ system, json }, messages) {
-  const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+async function callGemini(model, { system, json }, messages) {
   const data = await postJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     { 'x-goog-api-key': process.env.GEMINI_API_KEY },
@@ -83,8 +84,13 @@ async function callGroq({ system, json }, messages) {
 
 // 순서가 곧 폴백 순서다. 키가 없는 제공자는 건너뛴다.
 function activeProviders() {
+  const geminiModels = (process.env.GEMINI_MODELS || DEFAULT_GEMINI_MODELS).split(',').map((m) => m.trim());
   return [
-    { name: 'gemini', key: process.env.GEMINI_API_KEY, call: callGemini },
+    ...geminiModels.map((model) => ({
+      name: model,
+      key: process.env.GEMINI_API_KEY,
+      call: (prompt, messages) => callGemini(model, prompt, messages),
+    })),
     { name: 'groq', key: process.env.GROQ_API_KEY, call: callGroq },
   ].filter((p) => p.key);
 }
