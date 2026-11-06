@@ -7,7 +7,7 @@ import { bySatisfaction, planFacts, readAiSatisfaction, simpleSatisfaction } fro
 import { eligibilityProblems, scoreTimetable } from '../../lib/score.js';
 import { askAi, registerTimetable } from '../api.js';
 import { ensureLogin } from '../account.js';
-import { closeDialog, esc, hourRange, openDialog, pathLine, showAlert, showBusy, timetableGrid, win } from '../ui.js';
+import { closeDialog, esc, hourRange, pathLine, showAlert, showBusy, timetableGrid, win } from '../ui.js';
 import { save, state } from '../state.js';
 import { runPlanner } from './conditions.js';
 
@@ -62,7 +62,7 @@ function planHtml(plan, index, range) {
       ${timetableGrid(plan.sections, range)}
       ${checksHtml(plan.sat)}
       ${cons.length ? `<p class="cons">총점 감점: ${cons.map(esc).join(', ')}</p>` : ''}
-      <p class="course-list">${plan.score.stats.credits}학점: ${plan.sections.map((s) => esc(s.name)).join(', ')}</p>
+      <p class="course-list-line">${plan.score.stats.credits}학점: ${plan.sections.map((s) => esc(s.name)).join(', ')}</p>
       ${problems.length ? `<div class="box-note"><b>등록 자격 미달</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
       <button class="btn btn-go" data-register="${index}"${problems.length ? ' disabled' : ''}>이 안을 대표로 등록</button>
     </div>
@@ -100,12 +100,12 @@ function failureHtml() {
     <div class="row"><a class="btn" href="#/conditions">조건 다시 입력</a><a class="btn" href="#/courses">과목 다시 고르기</a></div>`);
 }
 
-function applyFix(fix) {
+function applyFix(fix, view) {
   if (fix.kind === 'condition') state.conditions = fix.conditions;
   else state.selectedKeys = state.selectedKeys.filter((k) => k !== fix.removeKey);
   runPlanner();
-  // 같은 주소라 hashchange가 없으므로 직접 다시 그린다
-  showPlans(document.getElementById('view'));
+  // 같은 주소라 hashchange가 없으므로 지금 화면의 칸에 직접 다시 그린다
+  showPlans(view);
 }
 
 function paint(view, plans) {
@@ -135,7 +135,7 @@ export async function showPlans(view) {
   if (state.plans.length === 0) {
     view.innerHTML = `${pathLine('시간표 편성 신청', '편성 결과')}${failureHtml()}`;
     for (const button of view.querySelectorAll('[data-fix]')) {
-      button.addEventListener('click', () => applyFix(state.diagnosis.fixes[Number(button.dataset.fix)]));
+      button.addEventListener('click', () => applyFix(state.diagnosis.fixes[Number(button.dataset.fix)], view));
     }
     return;
   }

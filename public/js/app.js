@@ -73,7 +73,11 @@ async function route() {
   closeDialog();
   paintChrome(name);
   window.scrollTo(0, 0);
-  cleanup = (await show(view, arg)) ?? null;
+  // 화면마다 새 칸을 준다. 이전 화면의 늦은 응답(fetch 뒤 innerHTML)은 떼어 낸 옛 칸에 그려져 보이지 않는다.
+  // 14:31 검수: 궁합 링크에서 다른 화면으로 넘어가면 늦게 온 궁합 응답이 새 화면을 덮어썼다.
+  const page = document.createElement('div');
+  view.replaceChildren(page);
+  cleanup = (await show(page, arg)) ?? null;
   paintChrome(name);
 }
 
