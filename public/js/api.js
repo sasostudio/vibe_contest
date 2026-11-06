@@ -1,7 +1,8 @@
 // 서버 호출 모음. 점수는 보내지 않고 분반 번호만 보낸다.
 import { idToken } from './auth.js';
 
-const AI_TIMEOUT_MS = 15000;
+// 서버가 한도 초과 때 최대 30초 줄을 서고 한 번의 호출에 최대 15초가 걸릴 수 있어 그보다 길게 둔다
+const AI_TIMEOUT_MS = 55000;
 
 // 실패하면 null을 돌려준다. 화면은 null이면 체크박스와 고정 문구로 진행한다.
 export async function askAi(task, text) {

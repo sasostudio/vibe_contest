@@ -132,3 +132,32 @@ test('작업별 출력 상한: 만족도 평가는 4096', async () => {
   await run({ body: { task: 'satisfaction', messages: [{ role: 'user', text: '평가' }] } });
   assert.equal(sent[0].generationConfig.maxOutputTokens, 4096);
 });
+
+test('한도 초과면 잠깐 기다렸다 다시 시도해 성공', async () => {
+  delete process.env.GROQ_API_KEY;
+  let calls = 0;
+  globalThis.fetch = async () => (++calls <= 2 ? reply(429) : reply(200, geminiOk));
+  const { status, data } = await run({ body: { task: 'verdict', messages: [{ role: 'user', text: '평가' }] } });
+  assert.equal(status, 200);
+  assert.equal(data.text, '제미나이 답');
+  assert.equal(calls, 3);
+});
+
+test('모델이 없으면(404) 기다리지 않고 바로 포기', async () => {
+  delete process.env.GROQ_API_KEY;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return reply(404); };
+  const started = Date.now();
+  const { status } = await run({ body: { task: 'verdict', messages: [{ role: 'user', text: '평가' }] } });
+  assert.equal(status, 503);
+  assert.equal(calls, 2);
+  assert.ok(Date.now() - started < 500);
+});
+
+test('연결 확인(ping)은 한도 초과여도 기다리지 않음', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return reply(429); };
+  const { status } = await run();
+  assert.equal(status, 503);
+  assert.equal(calls, 3);
+});

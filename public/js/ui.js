@@ -56,6 +56,7 @@ export function scoreTable(items) {
 const dialogRoot = () => document.getElementById('dialog');
 
 export function closeDialog() {
+  clearInterval(busyTimer);
   dialogRoot().innerHTML = '';
 }
 
@@ -64,8 +65,20 @@ export function openDialog(title, body) {
   return dialogRoot().querySelector('.modal');
 }
 
+// 대기 창. 사람이 몰려 AI가 줄을 서면 몇 초째인지 보여 준다. closeDialog가 타이머도 멈춘다.
+let busyTimer = null;
+const BUSY_NOTE_AFTER_S = 4;
+
 export function showBusy(message) {
-  openDialog('처리 중', `<div class="busy"><p>${esc(message)}</p><div class="bar"></div></div>`);
+  openDialog('처리 중', `<div class="busy"><p>${esc(message)}</p><div class="bar"></div><p class="hint" id="busy-wait"></p></div>`);
+  const started = Date.now();
+  clearInterval(busyTimer);
+  busyTimer = setInterval(() => {
+    const note = document.getElementById('busy-wait');
+    if (!note) return clearInterval(busyTimer);
+    const seconds = Math.floor((Date.now() - started) / 1000);
+    if (seconds >= BUSY_NOTE_AFTER_S) note.textContent = `${seconds}초 경과 · 이용자가 몰려 AI가 차례로 처리하고 있습니다. 오래 걸리면 코드가 대신 계산합니다.`;
+  }, 1000);
 }
 
 export function showAlert(title, lines) {
