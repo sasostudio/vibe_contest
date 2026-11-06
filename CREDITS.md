@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 개발 도구 | Claude Code | 코드 작성 보조 | https://claude.com/claude-code |
 | 서비스 내 AI | Gemini API | 앱 안의 AI 호출 (주력 후보) | https://ai.google.dev/gemini-api/docs |
-| 서비스 내 AI | Groq API | 앱 안의 AI 호출 (예비 후보) | https://console.groq.com/docs |
+| 서비스 내 AI | Groq API | 앱 안의 AI 호출 (예비, 모델 openai/gpt-oss-120b) | https://console.groq.com/docs |
 
 | 자체 교훈 | 옛 시간표편성기 (2026-08, 관리자 개인 도구) | 코드는 가져오지 않고 교훈 3개만 재사용: 요일 생략 시 직전 요일 상속, 식별 단위 = 과목번호+학과, 조합 실패 시 원인과 대안 제시 | 작업로그 2026-08 |
 | 자료 | 인천대 2026-2 종합강의시간표, 교양 최초 정원 공지 | 분반·시간·강의실·학점·정원 (교수 이름은 파싱 단계에서 제외) | 학교 공지 원본 xlsx |
