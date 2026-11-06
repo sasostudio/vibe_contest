@@ -10,3 +10,4 @@ dist/
 .vercel
 .claude/
 발표/
+prompts/*.pdf
