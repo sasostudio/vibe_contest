@@ -1,14 +1,15 @@
 // 3번 화면. 왼쪽에서 전공·교양을 고르고 오른쪽 시간표에서 바로 확인한다.
-// 탭: 추천 전공(담기) / 교양(희망·피할·이미 수강) / 과목 검색(담기). 분반 고정은 모든 탭에서 가능하다.
+// 탭: 추천 전공(담기) / 교양(희망·비희망) / 과목 검색(담기). 분반 고정은 모든 탭에서 가능하다.
 import { DATA } from '../../data/courses.js';
 import { GENERAL_AREAS } from '../../lib/conditions.js';
-import { defaultSelection, groupCourses, recommendedCourses, searchCourses, targetAllows } from '../../lib/planner.js';
+import { bestArrangement, defaultSelection, diagnose, groupCourses, recommendedCourses, searchCourses, targetAllows } from '../../lib/planner.js';
 import { DAY_NAMES, courseKey, formatTime, sectionsConflict } from '../../lib/timetable.js';
 import { esc, pathLine, showAlert, timetableGrid, win } from '../ui.js';
 import { save, state } from '../state.js';
 
 const GENERAL_TYPES = Object.keys(GENERAL_AREAS);
-const MARKS = [['', '상관없음'], ['want', '희망'], ['avoid', '피할'], ['taken', '이미 수강']];
+// 13:50 관리자: 「피할」과 「이미 수강」을 「비희망」 하나로 합침
+const MARKS = [['', '상관없음'], ['want', '희망'], ['avoid', '비희망']];
 const sectionById = new Map(DATA.courses.map((c) => [c.id, c]));
 
 export function coursesByKeys(keys) {
@@ -16,9 +17,9 @@ export function coursesByKeys(keys) {
   return groupCourses(DATA.courses.filter((c) => wanted.has(courseKey(c))));
 }
 
-// 편성에서 빼야 할 교양 과목번호 (피할, 이미 수강)
+// 편성에서 빼야 할 교양 과목번호 (비희망)
 export const excludedGeneralCodes = () => Object.entries(state.generalMarks)
-  .filter(([, mark]) => mark === 'avoid' || mark === 'taken')
+  .filter(([, mark]) => mark === 'avoid')
   .map(([key]) => key.split('|')[0]);
 
 const sectionNo = (section) => section.id.slice(-3);
@@ -83,7 +84,7 @@ function generalTab() {
   const courses = groupCourses(DATA.courses.filter((c) => GENERAL_TYPES.includes(c.type) && c.area === state.generalArea))
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   return `${areaButtons}
-    <p class="hint">희망은 반드시 넣고, 피할·이미 수강은 넣지 않습니다. 상관없음인 교양은 남은 학점을 채울 때 후보가 됩니다. ${esc(state.generalArea)} 과목 ${courses.length}개.</p>
+    <p class="hint">희망은 반드시 넣고, 비희망은 넣지 않습니다. 상관없음인 교양은 남은 학점을 채울 때 후보가 됩니다. ${esc(state.generalArea)} 과목 ${courses.length}개.</p>
     ${tableOf(courses, '선택')}`;
 }
 
@@ -98,21 +99,33 @@ function searchTab(query) {
 }
 
 // ── 오른쪽: 실시간 시간표와 담은 과목 ───────────────────────
-// 위치가 정해진 분반만 격자에 그린다: 고정한 분반, 분반이 하나뿐인 과목
-function placedSections() {
-  return coursesByKeys(state.selectedKeys).flatMap((c) => {
-    const pinned = c.sections.find((s) => s.id === state.pinned[c.key]);
-    if (pinned) return [pinned];
-    return c.sections.length === 1 ? c.sections : [];
+// 고정한 분반(실선)과 함께, 자동 배정 과목은 겹치지 않는 조합 중 총점이 가장 높은 분반을 「예상 배정」(점선)으로 그린다.
+// 실제 편성은 조건과 교양 채우기까지 하므로 달라질 수 있다.
+const NO_CONDITIONS = { freeDays: [], noFirst: false, noNight: false };
+let arrangementCache = { key: '', value: null };
+
+function arrangement() {
+  const key = JSON.stringify([state.selectedKeys, state.pinned]);
+  if (arrangementCache.key === key) return arrangementCache.value;
+  const courses = coursesByKeys(state.selectedKeys).map((c) => {
+    const only = c.sections.filter((s) => s.id === state.pinned[c.key]);
+    return only.length ? { ...c, sections: only } : c;
   });
+  const fixedIds = new Set(courses.filter((c) => c.sections.length === 1).map((c) => c.sections[0].id));
+  const best = bestArrangement(courses);
+  const value = best
+    ? { placed: best, guessIds: new Set(best.filter((s) => !fixedIds.has(s.id)).map((s) => s.id)), causes: [] }
+    : { placed: courses.filter((c) => c.sections.length === 1).map((c) => c.sections[0]), guessIds: new Set(), causes: diagnose(courses, NO_CONDITIONS).causes };
+  arrangementCache = { key, value };
+  return value;
 }
 
 function previewHtml(hoverId) {
-  const placed = placedSections();
+  const { placed, guessIds, causes } = arrangement();
   const hover = sectionById.get(hoverId);
   const showHover = hover && !placed.some((s) => s.id === hover.id);
   const sections = showHover ? [...placed, hover] : placed;
-  const marks = {};
+  const marks = Object.fromEntries([...guessIds].map((id) => [id, 'guess']));
   if (showHover) marks[hover.id] = placed.some((s) => sectionsConflict(s, hover)) ? 'ghost clash' : 'ghost';
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
@@ -120,15 +133,16 @@ function previewHtml(hoverId) {
     }
   }
   const picked = coursesByKeys(state.selectedKeys);
-  const floating = picked.filter((c) => !placed.some((s) => courseKey(s) === c.key));
   const sum = picked.reduce((total, c) => total + c.credits, 0);
   const count = (mark) => Object.values(state.generalMarks).filter((m) => m === mark).length;
   const rows = picked.map((c) => `<tr><td>${esc(c.name)}</td><td class="num">${c.credits}</td>
     <td class="mid"><button class="btn" data-remove="${esc(c.key)}">취소</button></td></tr>`).join('');
+  const clash = Object.values(marks).some((m) => m.includes('clash'));
   return `${timetableGrid(sections, undefined, marks)}
-    ${Object.values(marks).includes('clash') || marks[hover?.id]?.includes('clash') ? '<p class="clash-note">빨간 테두리: 시간이 겹칩니다.</p>' : ''}
-    ${floating.length ? `<p class="hint">자동 배정(편성 때 분반 결정): ${floating.map((c) => esc(c.name)).join(', ')}</p>` : ''}
-    <p><b>담은 과목 ${sum}학점</b> / 학적 상한 ${state.profile.creditCap}학점 · 피할 교양 ${count('avoid')} · 이미 수강 ${count('taken')}</p>
+    ${guessIds.size ? '<p class="hint">점선은 예상 배정입니다. 분반을 고정하지 않은 과목은 편성 때 조건에 맞춰 바뀔 수 있습니다.</p>' : ''}
+    ${causes.length ? `<div class="box-note"><b>담은 과목끼리 시간이 겹칩니다</b><ul>${causes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>` : ''}
+    ${clash ? '<p class="clash-note">빨간 테두리: 시간이 겹칩니다.</p>' : ''}
+    <p><b>담은 과목 ${sum}학점</b> / 학적 상한 ${state.profile.creditCap}학점 · 비희망 교양 ${count('avoid')}</p>
     ${picked.length ? `<div class="scroll"><table><tbody>${rows}</tbody></table></div>` : ''}`;
 }
 
@@ -140,6 +154,8 @@ export function showCourses(view) {
   }
   state.pinned ??= {};
   state.generalMarks ??= {};
+  // 합치기 전에 저장된 「이미 수강」은 비희망으로 옮긴다
+  for (const [key, mark] of Object.entries(state.generalMarks)) if (mark === 'taken') state.generalMarks[key] = 'avoid';
   state.courseTab ??= 'major';
   state.generalArea ??= '학문의기초';
   const recommended = recommendedCourses(DATA, state.profile);

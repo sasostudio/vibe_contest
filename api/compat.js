@@ -6,14 +6,14 @@ import { compareTimetables } from '../public/lib/compat.js';
 import { DAY_NAMES, formatTime } from '../public/lib/timetable.js';
 import { verifiedUid } from '../lib/session.js';
 import { getCompat, getEntry, getPair, pairKey, saveCompat, shareOwner } from '../lib/store.js';
-import { TOKEN_PATTERN, makeToken, publicCompat, sectionsOf, typeOf } from '../lib/share.js';
+import { TOKEN_PATTERN, makeToken, publicCompat, sectionsOf } from '../lib/share.js';
 import { writeCompatLine } from '../lib/verdict.js';
 import { clientIp, createLimiter } from '../lib/ratelimit.js';
 
 const viewLimiter = createLimiter(300);
 const makeLimiter = createLimiter(120);
 
-const person = (entry) => ({ nickname: entry.nickname, dept: entry.dept, typeName: typeOf(entry).name });
+const person = (entry) => ({ nickname: entry.nickname, dept: entry.dept, title: entry.title });
 const span = (w) => `${DAY_NAMES[w.day]} ${formatTime(w.start)}~${formatTime(w.end)}`;
 
 // 두 사람 다 시간표를 바꾸지 않았으면 저장본을 그대로 쓴다(AI 재호출 없음)

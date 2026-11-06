@@ -33,7 +33,7 @@ const span = (w) => `${DAY_NAMES[w.day]} ${formatTime(w.start)}~${formatTime(w.e
 const list = (items, empty) => (items.length ? `<ul>${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : `<p class="hint">${empty}</p>`);
 
 function compatHtml(c) {
-  const who = (p) => `${esc(p.nickname)} <span class="hint">${esc(p.dept)} · ${esc(p.typeName)}</span>`;
+  const who = (p) => `${esc(p.nickname)} <span class="hint">${esc(p.dept)} · ${esc(p.title ?? '')}</span>`;
   return `${pathLine('시간표 궁합')}
     ${win('시간표 궁합 결과', `
       <p class="lead">${who(c.a)}<br>× ${who(c.b)}</p>

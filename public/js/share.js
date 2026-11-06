@@ -25,7 +25,7 @@ export async function shareLink({ url, title, text }) {
 }
 
 // 내 결과 공유. 링크가 없으면 서버가 새로 만든다.
-export async function shareMyResult(entry, typeName) {
+export async function shareMyResult(entry) {
   const { ok, data } = await issueShare(false);
   if (!ok) {
     showAlert('공유 실패', [data.error ?? '잠시 뒤 다시 시도하십시오.']);
@@ -34,7 +34,7 @@ export async function shareMyResult(entry, typeName) {
   await shareLink({
     url: shareUrl('s', data.token),
     title: '시간표 심사 결과',
-    text: `${entry.nickname}님의 시간표 유형은 「${typeName}」, ${entry.grade} ${entry.score}점입니다. 나랑 시간표 궁합 볼래?`,
+    text: `${entry.nickname}님의 시간표 칭호는 「${entry.title}」, ${entry.grade} ${entry.score}점입니다. 나랑 시간표 궁합 볼래?`,
   });
 }
 

@@ -1,6 +1,5 @@
 // 공유 결과 화면(#/s/링크값). 로그인 없이 보이며 공개 정보만 나온다.
 import { fetchShare } from '../api.js';
-import { typeCardHtml } from '../typecard.js';
 import { esc, pathLine, win } from '../ui.js';
 import { startCompat } from './compat.js';
 
@@ -13,10 +12,10 @@ export async function showShared(view, token) {
   }
   view.innerHTML = `${pathLine('공유된 심사 결과')}
     ${win(`${data.nickname} 님의 시간표 심사 결과`, `
-      ${typeCardHtml({ id: data.typeId, name: data.typeName, line: data.typeLine })}
+      <p class="paper-title">칭호: ${esc(data.title)}</p>
+      <p class="paper-review">${esc(data.review)}</p>
       <table class="form"><tbody>
         <tr><th scope="row">소속</th><td>${esc(data.dept)}</td></tr>
-        <tr><th scope="row">칭호</th><td>${esc(data.title)}</td></tr>
         <tr><th scope="row">총점</th><td><b>${data.score}점 ${esc(data.grade)}</b></td></tr>
       </tbody></table>
       <div class="row"><button class="btn btn-go btn-big" id="compat">나랑 시간표 궁합 보기</button><a class="btn" href="#/profile">내 시간표 짜기</a></div>`)}`;

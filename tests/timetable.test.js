@@ -223,7 +223,7 @@ test('편성: 오전 수업 피하기는 오전 수업이 적은 안을 먼저 �
   assert.ok(avoid[0].score.stats.morningBlocks <= Math.min(...plain.map((p) => p.score.stats.morningBlocks)));
 });
 
-test('편성: 피할·이미 수강 교양은 채우지 않는다', () => {
+test('편성: 비희망 교양은 채우지 않는다', () => {
   const profile = { dept: '컴퓨터공학부', year: 2, creditCap: 24 };
   const courses = recommendedCourses(DATA, profile).slice(0, 2);
   const first = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS).plans;
@@ -232,4 +232,16 @@ test('편성: 피할·이미 수강 교양은 채우지 않는다', () => {
   const { plans } = generatePlans(DATA, profile, courses, DEFAULT_CONDITIONS, { excludeCodes: used });
   assert.ok(plans.length > 0);
   for (const plan of plans) for (const s of plan.sections) assert.ok(!used.includes(s.code), s.name);
+});
+
+test('예상 배정: 담은 과목을 겹치지 않게 배치하고, 어떻게 해도 겹치면 null', async () => {
+  const { bestArrangement } = await import('../public/lib/planner.js');
+  const course = (code, sectionsSlots) => ({ key: code, code, name: code, credits: 3, sections: sectionsSlots.map((slots, i) => section(`${code}00${i}`, slots)) });
+  const a = course('A00000', [[[0, 600, 690, room]], [[1, 600, 690, room]]]);
+  const b = course('B00000', [[[0, 600, 690, room]]]);
+  const picked = bestArrangement([a, b]);
+  assert.equal(picked.length, 2);
+  assert.equal(findConflict(picked), null);
+  const c = course('C00000', [[[0, 600, 690, room]]]);
+  assert.equal(bestArrangement([b, c]), null);
 });

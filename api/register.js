@@ -5,7 +5,6 @@ import { verifiedUid } from '../lib/session.js';
 import { getEntry, saveEntry } from '../lib/store.js';
 import { buildLeague, standingOf } from '../lib/league.js';
 import { writeVerdict } from '../lib/verdict.js';
-import { classifyType } from '../public/lib/mbti.js';
 
 const MIN_INTERVAL_MS = 15000;
 const MAX_SECTIONS = 14;
@@ -50,11 +49,10 @@ export default async function handler(req, res) {
     }
 
     const score = scoreTimetable(sections);
-    const type = classifyType(sections);
     // 같은 시간표를 다시 등록하면 AI를 부르지 않는다
     const verdict = sameSections(previous, sections) && previous.dept === profile.dept
-      ? { title: previous.title, review: previous.review, typeLine: previous.typeLine ?? '', source: previous.verdictSource }
-      : await writeVerdict({ dept: profile.dept, sections, score, type });
+      ? { title: previous.title, review: previous.review, source: previous.verdictSource }
+      : await writeVerdict({ dept: profile.dept, sections, score });
 
     const entry = {
       ...profile,
@@ -67,8 +65,6 @@ export default async function handler(req, res) {
       title: verdict.title,
       review: verdict.review,
       verdictSource: verdict.source,
-      typeId: type.id,
-      typeLine: verdict.typeLine,
       // 다시 등록해도 공유 링크는 그대로 둔다
       ...(previous?.shareToken ? { shareToken: previous.shareToken } : {}),
       previousScore: previous?.score ?? null,

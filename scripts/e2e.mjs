@@ -50,9 +50,10 @@ const checked = await page.locator('#course-area input[type=checkbox]:checked').
 check('추천 과목이 기본 체크됨', checked > 0, `${checked}개`);
 const sectionText = await page.textContent('table.sections');
 check('분반별 시간과 강의실 표시', /\d\d:\d\d~\d\d:\d\d \(/.test(sectionText));
-const before = await page.locator('#preview .class').count();
+check('분반을 안 골라도 예상 배정 표시', (await page.locator('#preview .class.guess').count()) > 0);
+const guessBefore = await page.locator('#preview .class.guess').count();
 await page.locator('[data-pin-key]').nth(1).check();
-check('분반 고정이 실시간 시간표에 반영', (await page.locator('#preview .class').count()) > before);
+check('분반 고정이 실시간 시간표에 반영', (await page.locator('#preview .class.guess').count()) < guessBefore);
 await page.hover('tr[data-section] >> nth=4');
 check('마우스 올린 분반 미리보기', (await page.locator('#preview .class.ghost').count()) > 0);
 await page.locator('[data-pin-key][value=""]').first().check();
@@ -65,9 +66,9 @@ const wantName = await page.locator('#tab-body tr.course-head b').first().textCo
 await page.locator('#tab-body [data-mark-key][value="want"]').first().check();
 check('희망 교양이 담은 과목에 추가', (await page.textContent('#preview')).includes(wantName), wantName);
 await page.locator('#tab-body [data-mark-key][value="avoid"]').nth(1).check();
-await page.locator('#tab-body [data-mark-key][value="taken"]').nth(2).check();
+await page.locator('#tab-body [data-mark-key][value="avoid"]').nth(2).check();
 const counts = await page.textContent('#preview');
-check('피할·이미 수강 개수 표시', counts.includes('피할 교양 1') && counts.includes('이미 수강 1'));
+check('비희망 개수 표시', counts.includes('비희망 교양 2'));
 await shot(page, '02b-general');
 await page.locator('#tab-body [data-mark-key][value=""]').first().check();
 await page.click('[data-tab=major]');

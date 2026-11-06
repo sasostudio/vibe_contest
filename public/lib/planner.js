@@ -60,6 +60,21 @@ export function defaultSelection(courses, conditions, credits = 12) {
   return picked;
 }
 
+// 과목 화면의 실시간 미리보기용: 담은 과목만으로 겹치지 않는 분반 조합 중 총점이 가장 높은 것. 없으면 null.
+// 조건(공강 요일 등)은 다음 단계에서 적용하므로 여기서는 겹침만 본다.
+const OPEN_CONDITIONS = { freeDays: [], noFirst: false, noNight: false };
+export function bestArrangement(courses) {
+  const bases = searchCombinations(courses, OPEN_CONDITIONS);
+  if (bases.length === 0) return null;
+  let best = bases[0];
+  let bestTotal = -1;
+  for (const sections of bases) {
+    const total = scoreTimetable(sections).total;
+    if (total > bestTotal) [best, bestTotal] = [sections, total];
+  }
+  return best;
+}
+
 export function searchCourses(data, query, limit = 30) {
   const text = query.trim().replace(/\s/g, '');
   if (!text) return [];

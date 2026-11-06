@@ -152,7 +152,7 @@ export function showConditions(view) {
           ~ <label for="max-credits">최대</label> <select id="max-credits">${steps}</select>
           <span class="hint">학적의 학점 상한 ${state.profile.creditCap}학점을 넘지 않습니다.</span>
         </td></tr>
-        <tr><th scope="row">채울 교양 영역</th><td>${areaRows()}<p class="hint">자동으로 채울 교양의 영역입니다. 아무것도 고르지 않으면 모든 영역에서 채웁니다. 과목별 희망·피할·이미 수강은 과목 확인 화면의 교양 탭에서 고릅니다.</p></td></tr>
+        <tr><th scope="row">채울 교양 영역</th><td>${areaRows()}<p class="hint">자동으로 채울 교양의 영역입니다. 아무것도 고르지 않으면 모든 영역에서 채웁니다. 과목별 희망·비희망은 과목 확인 화면의 교양 탭에서 고릅니다.</p></td></tr>
         <tr><th scope="row"><label for="want">듣고 싶은 교양</label></th><td><input id="want" type="text" placeholder="쉼표로 구분"></td></tr>
         <tr><th scope="row"><label for="avoid">피할 과목</label></th><td><input id="avoid" type="text" placeholder="쉼표로 구분"></td></tr>
       </tbody></table>

@@ -51,7 +51,7 @@ async function registerTimetable(page, dept, nickname) {
 // 1. A가 등록하고 공유
 const a = await phone();
 await registerTimetable(a, '정보통신공학과', '공유시험A');
-check('결과에 시간표 유형 표시', (await a.textContent('.type-name')).length > 0, await a.textContent('.type-name'));
+check('결과에 칭호 표시', (await a.textContent('.paper-title')).includes('칭호'), await a.textContent('.paper-title'));
 await a.click('#share-result');
 const shareUrl = await copiedUrl(a);
 const shareToken = shareUrl.split('#/s/')[1];
@@ -63,7 +63,7 @@ const b = await phone();
 await b.goto(shareUrl);
 await b.waitForSelector('#compat');
 const sharedText = await b.textContent('#view');
-check('로그인 없이 공유 결과 열람', sharedText.includes('공유시험A') && sharedText.includes('점'));
+check('로그인 없이 공유 결과 열람(칭호+평론)', sharedText.includes('공유시험A') && sharedText.includes('칭호') && (await b.textContent('.paper-review')).length > 0);
 check('공유 화면에 시간표·수업 시각 없음', !/\d\d:\d\d/.test(sharedText) && (await b.locator('.class').count()) === 0);
 check('공유 화면 가로 넘침 없음', (await overflow(b)) <= 0);
 await shot(b, 's2-shared');
